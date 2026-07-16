@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg18
+    environment:
+      POSTGRES_USER: erp
+      POSTGRES_PASSWORD: erp
+      POSTGRES_DB: erp
+    ports: ["5432:5432"]
+    # PG18 images store data in a version-specific subdir; mount the volume at the
+    # parent /var/lib/postgresql (NOT .../data) or the entrypoint refuses to start.
+    volumes: ["pgdata:/var/lib/postgresql"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U erp -d erp"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  pgdata:
