@@ -155,6 +155,7 @@ A slice is **done** only when all pass:
 - [ ] **Idempotent:** handler safe under at-least-once redelivery
 - [ ] **Reviewed:** `code-review` (+ `security-review` for auth/data/AI paths) clean; `verification-before-completion` run with real command output
 - [ ] **Versions current:** APIs match pinned versions (Context7-checked)
+- [ ] **Journal updated:** decision → `journal/DECISIONS.md`, progress → `journal/PROGRESS.md`; the active `plans/` task status set
 
 ---
 

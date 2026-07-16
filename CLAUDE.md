@@ -50,6 +50,13 @@ Keyboard navigable, visible focus, correct ARIA, AA contrast — on every surfac
 ## Workflow
 Backend → **[workflow-backend.md](workflow-backend.md)**; Frontend → **[workflow.md](workflow.md)**. Universal rhythm: **brainstorm → plan → (test-first) → build one slice → verify → review → commit.** **Use plan mode** for anything non-trivial before editing.
 
+## Plans & journal (cross-session continuity — read this every session)
+Context resets between sessions, so state lives in the repo:
+- **`plans/`** — implementation plans (one per phase/slice) with task checklists + status. The active plan is the source of truth for what's done and what's next.
+- **`journal/DECISIONS.md`** — append-only decision log (why we chose things). **`journal/PROGRESS.md`** — append-only session log (what changed · status · next).
+
+**At session start:** read `journal/PROGRESS.md` (latest entries) + the active `plans/` file to recover context. **As you work:** update the plan's task status; append a `D-NNN` entry to `DECISIONS.md` for any real decision; append a dated `PROGRESS.md` entry at the end of a meaningful task/session. **Append-only — never rewrite past entries.**
+
 ## Guardrails
 - **Correctness & data-integrity first.** Money/stock/number-ranges are sacred; property-test them.
 - **AI never writes without human approval** (the 5 invariants above). Keep **both** toggles green: standalone/SAP and cloud/local-AI.
