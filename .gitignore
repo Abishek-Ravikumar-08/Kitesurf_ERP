@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+.yarn/
+
+# Build output
+dist/
+build/
+out/
+.next/
+.turbo/
+*.tsbuildinfo
+
+# Test / coverage
+coverage/
+.vitest/
+playwright-report/
+test-results/
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+*.sops.yaml
+
+# Python (ML sidecars)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.uv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Local tooling / IDE
+.claude/settings.local.json
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker / appliance build artifacts
+*.tar
+*.tar.gz
+appliance-build/
