@@ -9,6 +9,9 @@ catalogs:
     '@biomejs/biome':
       specifier: ^1.9.4
       version: 1.9.4
+    decimal.js:
+      specifier: ^10.4.3
+      version: 10.6.0
     dependency-cruiser:
       specifier: ^16.9.0
       version: 16.10.4
@@ -21,6 +24,9 @@ catalogs:
     typescript:
       specifier: ^5.7.0
       version: 5.9.3
+    uuid:
+      specifier: ^11.0.0
+      version: 11.1.1
     vitest:
       specifier: ^2.1.0
       version: 2.1.9
@@ -41,6 +47,22 @@ importers:
       lint-staged:
         specifier: 'catalog:'
         version: 15.5.2
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 2.1.9
+
+  packages/kernel:
+    dependencies:
+      decimal.js:
+        specifier: 'catalog:'
+        version: 10.6.0
+      uuid:
+        specifier: 'catalog:'
+        version: 11.1.1
+    devDependencies:
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -521,6 +543,9 @@ packages:
       supports-color:
         optional: true
 
+  decimal.js@10.6.0:
+    resolution: {integrity: sha512-YpgQiITW3JXGntzdUmyUR1V812Hn8T1YVXhCu+wO3OpS4eU9l4YdD3qjyiKdV6mvV29zapkMeD390UVEf2lkUg==}
+
   deep-eql@5.0.2:
     resolution: {integrity: sha512-h5k/5U50IJJFpzfL6nO9jaaumfjO/f2NjK/oYB2Djzm4p9L+3T9qWpZqZ2hAbLPuuYq9wrU08WQyBTL5GbPk5Q==}
     engines: {node: '>=6'}
@@ -922,6 +947,10 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
+  uuid@11.1.1:
+    resolution: {integrity: sha512-vIYxrBCC/N/K+Js3qSN88go7kIfNPssr/hHCesKCQNAjmgvYS2oqr69kIufEG+O4+PfezOH4EbIeHCfFov8ZgQ==}
+    hasBin: true
+
   vite-node@2.1.9:
     resolution: {integrity: sha512-AM9aQ/IPrW/6ENLQg3AGY4K1N2TGZdR5e4gu/MmmR2xR3Ll1+dib+nook92g4TV3PXVyeyxdWwtaCAiUL0hMxA==}
     engines: {node: ^18.0.0 || >=20.0.0}
@@ -1321,6 +1350,8 @@ snapshots:
     dependencies:
       ms: 2.1.3
 
+  decimal.js@10.6.0: {}
+
   deep-eql@5.0.2: {}
 
   dependency-cruiser@16.10.4:
@@ -1718,6 +1749,8 @@ snapshots:
       strip-bom: 3.0.0
 
   typescript@5.9.3: {}
+
+  uuid@11.1.1: {}
 
   vite-node@2.1.9:
     dependencies:
