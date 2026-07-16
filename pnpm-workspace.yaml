@@ -17,6 +17,7 @@ catalog:
   uuid: ^11.0.0
   # tooling / dev
   drizzle-kit: 0.31.5
+  "@types/pg": ^8.11.0
   typescript: ^5.7.0
   vitest: ^2.1.0
   "@testcontainers/postgresql": ^10.13.0
