@@ -30,6 +30,9 @@ catalogs:
     vitest:
       specifier: ^2.1.0
       version: 2.1.9
+    zod:
+      specifier: ^4.4.3
+      version: 4.4.3
 
 importers:
 
@@ -47,6 +50,19 @@ importers:
       lint-staged:
         specifier: 'catalog:'
         version: 15.5.2
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 2.1.9
+
+  packages/contracts:
+    dependencies:
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
+    devDependencies:
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1036,6 +1052,9 @@ packages:
     engines: {node: '>= 14.6'}
     hasBin: true
 
+  zod@4.4.3:
+    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
+
 snapshots:
 
   '@biomejs/biome@1.9.4':
@@ -1829,3 +1848,5 @@ snapshots:
       strip-ansi: 7.2.0
 
   yaml@2.9.0: {}
+
+  zod@4.4.3: {}
