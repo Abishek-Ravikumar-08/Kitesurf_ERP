@@ -19,4 +19,4 @@ the active plan here is the source of truth for *what's done* and *what's next*.
 ## Index
 | Plan | Implements (spec §) | Status | Updated |
 |------|---------------------|--------|---------|
-| _(none yet — Phase 1 is next)_ | | | |
+| [phase-01-repo-platform-skeleton.md](phase-01-repo-platform-skeleton.md) | §1, §2.1, §4, §8 | 🔲 not started (plan approved) | 2026-07-16 |
