@@ -21,5 +21,6 @@
     "lint-staged": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
-  }
+  },
+  "lint-staged": { "*.{ts,tsx,js,json,md}": "biome check --write --no-errors-on-unmatched" }
 }
