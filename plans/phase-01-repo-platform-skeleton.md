@@ -9,8 +9,8 @@
 **Tech Stack:** pnpm 10 (workspaces + catalog) · TypeScript · NestJS 11 · Drizzle ORM 0.45 + drizzle-kit 0.31 · PostgreSQL 18 (+ pgvector image) · Zod 4 · decimal.js · Vitest + Testcontainers · Biome + dependency-cruiser + Husky · GitHub Actions.
 
 - **Implements:** spec §1, §2.1, §4, §7 (tenancy/config seams), §8 (event envelope, config/flags) — [2026-07-16-erp-ai-native-system-design.md](../docs/superpowers/specs/2026-07-16-erp-ai-native-system-design.md)
-- **Status:** 🚧 in progress — Tasks 0–7 complete on `phase-01-skeleton`; Tasks 8–10 remaining
-- **Created:** 2026-07-16 · **Last updated:** 2026-07-16
+- **Status:** ✅ implemented (Tasks 0–10), pushed to `phase-01-skeleton`; local CI all-green (typecheck · lint · boundaries · 22 unit · 2 db integration · build). ⏳ PR to `main` + CI-green confirmation pending — **user opens the PR** (no gh CLI / github MCP this session; CI runs on PR open).
+- **Created:** 2026-07-16 · **Last updated:** 2026-07-17
 - **Depends on:** — (greenfield; git already initialized on `main`, remote → GitHub `Kitesurf_ERP`)
 
 ---
@@ -924,7 +924,7 @@ git commit -m "feat(db): drizzle client, platform_meta migration, and schema-ver
 
 **Files:** Create `apps/api/{package.json,tsconfig.json,nest-cli.json,vitest.config.ts}`, `apps/api/src/{main.ts,app.module.ts}`, `apps/api/src/config/{env.ts,config.module.ts,env.test.ts}`, `apps/api/src/health/{health.controller.ts,health.module.ts,health.e2e.test.ts}`.
 
-- [ ] **Step 1: Scaffolding**
+- [x] **Step 1: Scaffolding**
 
 `apps/api/package.json`:
 ```json
@@ -983,7 +983,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 2: Write the failing test for config validation (fail-fast)**
+- [x] **Step 2: Write the failing test for config validation (fail-fast)**
 
 `apps/api/src/config/env.test.ts`:
 ```ts
@@ -1002,9 +1002,9 @@ describe("loadConfig", () => {
 });
 ```
 
-- [ ] **Step 3: Run it, see it fail** — Run: `pnpm --filter @erp/api test` → FAIL.
+- [x] **Step 3: Run it, see it fail** — Run: `pnpm --filter @erp/api test` → FAIL.
 
-- [ ] **Step 4: Implement `src/config/env.ts`**
+- [x] **Step 4: Implement `src/config/env.ts`**
 
 ```ts
 import { z } from "zod";
@@ -1029,9 +1029,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 }
 ```
 
-- [ ] **Step 5: Run it, see it pass** — Run: `pnpm --filter @erp/api test` → PASS.
+- [x] **Step 5: Run it, see it pass** — Run: `pnpm --filter @erp/api test` → PASS.
 
-- [ ] **Step 6: Config module + app module**
+- [x] **Step 6: Config module + app module**
 
 `apps/api/src/config/config.module.ts`:
 ```ts
@@ -1057,7 +1057,7 @@ import { HealthModule } from "./health/health.module.js";
 export class AppModule {}
 ```
 
-- [ ] **Step 7: Write the failing e2e test for `/health`**
+- [x] **Step 7: Write the failing e2e test for `/health`**
 
 `apps/api/src/health/health.e2e.test.ts`:
 ```ts
@@ -1085,9 +1085,9 @@ describe("health (e2e)", () => {
 });
 ```
 
-- [ ] **Step 8: Run it, see it fail** — Run: `pnpm --filter @erp/api test` → FAIL.
+- [x] **Step 8: Run it, see it fail** — Run: `pnpm --filter @erp/api test` → FAIL.
 
-- [ ] **Step 9: Implement health module + controller + `main.ts`**
+- [x] **Step 9: Implement health module + controller + `main.ts`**
 
 `apps/api/src/health/health.controller.ts`:
 ```ts
@@ -1124,14 +1124,14 @@ async function bootstrap() {
 void bootstrap();
 ```
 
-- [ ] **Step 10: Run it, see it pass** — Run: `pnpm --filter @erp/api test` → PASS.
+- [x] **Step 10: Run it, see it pass** — Run: `pnpm --filter @erp/api test` → PASS.
 
-- [ ] **Step 11: Manual smoke against dev Postgres**
+- [x] **Step 11: Manual smoke against dev Postgres**
 
 Run: `docker compose up -d && pnpm --filter @erp/api build && node apps/api/dist/main.js`
 Then: `curl -s localhost:3000/health` → Expected: `{"status":"ok"}`. Stop the process.
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 ```bash
 git add apps/api
 git commit -m "feat(api): NestJS bootstrap, Zod-validated config (fail-fast), /health"
@@ -1145,7 +1145,7 @@ git commit -m "feat(api): NestJS bootstrap, Zod-validated config (fail-fast), /h
 
 **Files:** Create `.dependency-cruiser.cjs`, `.husky/pre-commit`; modify root `package.json` (lint-staged config).
 
-- [ ] **Step 1: Write the boundary rules**
+- [x] **Step 1: Write the boundary rules**
 
 `.dependency-cruiser.cjs`:
 ```js
@@ -1195,12 +1195,12 @@ module.exports = {
 > Before Phase 2 introduces real cross-package `@erp/*` imports, confirm `tsConfig` (+ `enhancedResolveOptions` if needed) lets dependency-cruiser resolve `.js`→`.ts` specifiers and workspace package names — otherwise the deep-import rules stay exit 0 but under-enforced.
 > `from.path` captures the package name as `$1`; `to.pathNot: "^packages/$1/"` lets a package import its OWN `src` (relative internal imports) while blocking deep imports into *other* packages' internals — `src/index` and `*.test.ts` are always allowed. In Phase 1 no package imports another `@erp/*`, so this stays clean (exit 0). Verify the capture-group reference resolves as expected (dist vs src) at execution.
 
-- [ ] **Step 2: Verify boundaries pass on the current tree**
+- [x] **Step 2: Verify boundaries pass on the current tree**
 
 Run: `pnpm boundaries`
 Expected: no violations (exit 0). Fix any real violation surfaced.
 
-- [ ] **Step 3: Husky + lint-staged pre-commit**
+- [x] **Step 3: Husky + lint-staged pre-commit**
 
 Run: `pnpm exec husky init`
 `.husky/pre-commit`:
@@ -1212,7 +1212,7 @@ Add to root `package.json`:
 "lint-staged": { "*.{ts,tsx,js,json,md}": "biome check --write --no-errors-on-unmatched" }
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 ```bash
 git add .dependency-cruiser.cjs .husky package.json
 git commit -m "chore: dependency-cruiser boundaries + husky pre-commit"
@@ -1224,7 +1224,7 @@ git commit -m "chore: dependency-cruiser boundaries + husky pre-commit"
 
 **Files:** Create `.github/workflows/ci.yml`.
 
-- [ ] **Step 1: Write the workflow** (Docker is available on `ubuntu-latest` for Testcontainers)
+- [x] **Step 1: Write the workflow** (Docker is available on `ubuntu-latest` for Testcontainers)
 
 `.github/workflows/ci.yml`:
 ```yaml
@@ -1249,7 +1249,7 @@ jobs:
       - run: pnpm build
 ```
 
-- [ ] **Step 2: Verify locally that each command the CI runs is green**
+- [x] **Step 2: Verify locally that each command the CI runs is green**
 
 Run (in order): `pnpm typecheck && pnpm lint && pnpm boundaries && pnpm test && pnpm -r test:int && pnpm build`
 Expected: all green.
@@ -1262,7 +1262,7 @@ git push -u origin phase-01-skeleton
 ```
 Then open a PR to `main` (via the github MCP or `gh pr create`) and confirm CI is green.
 
-- [ ] **Step 4: Update plan + journal**
+- [x] **Step 4: Update plan + journal**
 - Set this plan's Status → ✅ and check off tasks.
 - Append a `PROGRESS.md` entry (what shipped, CI green, next = Phase 2 correctness core).
 - Add `D-013` to `DECISIONS.md` if any implementation decision diverged from the plan (e.g., Postgres image tag, Vitest/SWC setup).
@@ -1270,12 +1270,12 @@ Then open a PR to `main` (via the github MCP or `gh pr create`) and confirm CI i
 ---
 
 ## Verification (Definition of Done for Phase 1)
-- [ ] `pnpm install` clean; workspace resolves; versions pinned in the catalog (Context7-verified)
-- [ ] `@erp/kernel` unit tests green: Money (incl. `allocate` sums back), UoM round-trip, DomainEvent envelope
-- [ ] `@erp/contracts` generates OpenAPI component schemas from Zod
-- [ ] `@erp/db` **integration** test green on a **real Postgres (Testcontainers)**: migrations apply, schema-version gate passes, and **fails closed on mismatch**
-- [ ] `apps/api` boots; config **fails fast** on bad env; `GET /health` → `{status:"ok"}` (e2e)
-- [ ] `pnpm boundaries` passes; Husky pre-commit active
+- [x] `pnpm install` clean; workspace resolves; versions pinned in the catalog (Context7-verified)
+- [x] `@erp/kernel` unit tests green: Money (incl. `allocate` sums back), UoM round-trip, DomainEvent envelope
+- [x] `@erp/contracts` generates OpenAPI component schemas from Zod
+- [x] `@erp/db` **integration** test green on a **real Postgres (Testcontainers)**: migrations apply, schema-version gate passes, and **fails closed on mismatch**
+- [x] `apps/api` boots; config **fails fast** on bad env; `GET /health` → `{status:"ok"}` (e2e)
+- [x] `pnpm boundaries` passes; Husky pre-commit active
 - [ ] CI green on the PR (typecheck · lint · boundaries · unit · integration · build)
 - [ ] Plan status + `journal/PROGRESS.md` + `journal/DECISIONS.md` updated; PR opened to `main`
 
@@ -1289,3 +1289,4 @@ Then open a PR to `main` (via the github MCP or `gh pr create`) and confirm CI i
 ## Progress log
 - 2026-07-16: Plan written (Context7-verified Drizzle/Zod/NestJS APIs). Not yet started. Next: execute Task 0 on a `phase-01-skeleton` branch.
 - 2026-07-17: Executed Tasks 0–7 via subagent-driven TDD on `phase-01-skeleton` (8 commits: hygiene → workspace → kernel → contracts → Compose → db). Review corrected `Money.allocate` (D-015) and hardened the db boot-gate test; deviations D-013–D-017 recorded. Next: Tasks 8–10 + PR to `main`.
+- 2026-07-17: Executed Tasks 8–10 (`apps/api` boot + fail-fast config + `/health`; dependency-cruiser boundaries + Husky; CI workflow). All CI commands green locally; 12 commits pushed. D-018 recorded. **Phase 1 implementation complete** — PR to `main` pending (gh/MCP unavailable this session; user opens it, CI runs on PR open).
