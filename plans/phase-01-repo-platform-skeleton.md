@@ -9,8 +9,8 @@
 **Tech Stack:** pnpm 10 (workspaces + catalog) · TypeScript · NestJS 11 · Drizzle ORM 0.45 + drizzle-kit 0.31 · PostgreSQL 18 (+ pgvector image) · Zod 4 · decimal.js · Vitest + Testcontainers · Biome + dependency-cruiser + Husky · GitHub Actions.
 
 - **Implements:** spec §1, §2.1, §4, §7 (tenancy/config seams), §8 (event envelope, config/flags) — [2026-07-16-erp-ai-native-system-design.md](../docs/superpowers/specs/2026-07-16-erp-ai-native-system-design.md)
-- **Status:** 🔲 not started
-- **Created:** 2026-07-16 · **Last updated:** 2026-07-16
+- **Status:** ✅ **complete** — Tasks 0–10 on `phase-01-skeleton` (14 commits); **PR #1 open to `main`, CI green** (`build-test` ✓ on the `pull_request` trigger). Ready to merge. Next: Phase 2 — correctness core.
+- **Created:** 2026-07-16 · **Last updated:** 2026-07-17
 - **Depends on:** — (greenfield; git already initialized on `main`, remote → GitHub `Kitesurf_ERP`)
 
 ---
@@ -83,14 +83,14 @@ apps/api/                         # NestJS modulith (only health + config for no
 
 **Files:** Create `.gitattributes`, `.editorconfig`, `.nvmrc`, `.env.example`.
 
-- [ ] **Step 1: Create the branch**
+- [x] **Step 1: Create the branch**
 
 Run:
 ```bash
 git checkout -b phase-01-skeleton
 ```
 
-- [ ] **Step 2: Add `.gitattributes`** (normalize line endings — silences the CRLF warnings)
+- [x] **Step 2: Add `.gitattributes`** (normalize line endings — silences the CRLF warnings)
 
 `.gitattributes`:
 ```
@@ -101,7 +101,7 @@ git checkout -b phase-01-skeleton
 *.glb binary
 ```
 
-- [ ] **Step 3: Add `.editorconfig`, `.nvmrc`, `.env.example`**
+- [x] **Step 3: Add `.editorconfig`, `.nvmrc`, `.env.example`**
 
 `.editorconfig`:
 ```ini
@@ -127,7 +127,7 @@ INTEGRATION_MODE=standalone
 DATA_EGRESS=deny
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 ```bash
 git add .gitattributes .editorconfig .nvmrc .env.example
 git commit -m "chore: repo hygiene (gitattributes, editorconfig, nvmrc, env example)"
@@ -139,7 +139,7 @@ git commit -m "chore: repo hygiene (gitattributes, editorconfig, nvmrc, env exam
 
 **Files:** Create `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `biome.json`.
 
-- [ ] **Step 1: `pnpm-workspace.yaml`** — workspaces + the version **catalog** (single source of pinned versions; **re-verify each via Context7 at execution**)
+- [x] **Step 1: `pnpm-workspace.yaml`** — workspaces + the version **catalog** (single source of pinned versions; **re-verify each via Context7 at execution**)
 
 ```yaml
 packages:
@@ -173,7 +173,7 @@ catalog:
   "lint-staged": ^15.2.0
 ```
 
-- [ ] **Step 2: root `package.json`**
+- [x] **Step 2: root `package.json`**
 
 ```json
 {
@@ -203,7 +203,7 @@ catalog:
 }
 ```
 
-- [ ] **Step 3: `tsconfig.base.json`** (strict)
+- [x] **Step 3: `tsconfig.base.json`** (strict)
 
 ```json
 {
@@ -226,7 +226,7 @@ catalog:
 }
 ```
 
-- [ ] **Step 4: `biome.json`**
+- [x] **Step 4: `biome.json`**
 
 ```json
 {
@@ -238,12 +238,12 @@ catalog:
 }
 ```
 
-- [ ] **Step 5: Install & verify the workspace resolves**
+- [x] **Step 5: Install & verify the workspace resolves**
 
 Run: `pnpm install`
 Expected: completes without error; `pnpm-lock.yaml` created.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 ```bash
 git add package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json biome.json
 git commit -m "chore: pnpm workspace, version catalog, tsconfig, biome"
@@ -255,7 +255,7 @@ git commit -m "chore: pnpm workspace, version catalog, tsconfig, biome"
 
 **Files:** Create `packages/kernel/{package.json,tsconfig.json,vitest.config.ts}`, `packages/kernel/src/{index.ts,id.ts,domain-event.ts}`, `packages/kernel/src/{id.test.ts,domain-event.test.ts}`.
 
-- [ ] **Step 1: Package scaffolding**
+- [x] **Step 1: Package scaffolding**
 
 `packages/kernel/package.json`:
 ```json
@@ -286,7 +286,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({ test: { include: ["src/**/*.test.ts"] } });
 ```
 
-- [ ] **Step 2: Write the failing test for branded IDs**
+- [x] **Step 2: Write the failing test for branded IDs**
 
 `packages/kernel/src/id.test.ts`:
 ```ts
@@ -305,12 +305,12 @@ describe("id", () => {
 });
 ```
 
-- [ ] **Step 3: Run it, see it fail**
+- [x] **Step 3: Run it, see it fail**
 
 Run: `pnpm --filter @erp/kernel test`
 Expected: FAIL (`./id.js` not found).
 
-- [ ] **Step 4: Implement `src/id.ts`**
+- [x] **Step 4: Implement `src/id.ts`**
 
 ```ts
 import { v7 as uuidv7 } from "uuid";
@@ -329,12 +329,12 @@ export const asUserId = (s: string): UserId => s as UserId;
 export const asEventId = (s: string): EventId => s as EventId;
 ```
 
-- [ ] **Step 5: Run it, see it pass**
+- [x] **Step 5: Run it, see it pass**
 
 Run: `pnpm --filter @erp/kernel test`
 Expected: PASS.
 
-- [ ] **Step 6: Write the failing test for the DomainEvent envelope**
+- [x] **Step 6: Write the failing test for the DomainEvent envelope**
 
 `packages/kernel/src/domain-event.test.ts`:
 ```ts
@@ -365,9 +365,9 @@ describe("createEvent", () => {
 });
 ```
 
-- [ ] **Step 7: Run it, see it fail** — Run: `pnpm --filter @erp/kernel test` → FAIL.
+- [x] **Step 7: Run it, see it fail** — Run: `pnpm --filter @erp/kernel test` → FAIL.
 
-- [ ] **Step 8: Implement `src/domain-event.ts`**
+- [x] **Step 8: Implement `src/domain-event.ts`**
 
 ```ts
 import { asEventId, type EventId, newId, type TenantId, type UserId } from "./id.js";
@@ -413,9 +413,9 @@ export function createEvent<TType extends string, TPayload>(
 }
 ```
 
-- [ ] **Step 9: Run it, see it pass** — Run: `pnpm --filter @erp/kernel test` → PASS.
+- [x] **Step 9: Run it, see it pass** — Run: `pnpm --filter @erp/kernel test` → PASS.
 
-- [ ] **Step 10: Barrel + build check** — `packages/kernel/src/index.ts`:
+- [x] **Step 10: Barrel + build check** — `packages/kernel/src/index.ts`:
 ```ts
 export * from "./id.js";
 export * from "./domain-event.js";
@@ -424,7 +424,7 @@ export * from "./quantity.js";
 ```
 Run: `pnpm --filter @erp/kernel build` → Expected: PASS (no type errors). *(money/quantity are added next tasks; if building before them, temporarily export only id+domain-event, then re-add.)*
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 ```bash
 git add packages/kernel
 git commit -m "feat(kernel): branded ids and DomainEvent envelope"
@@ -436,7 +436,7 @@ git commit -m "feat(kernel): branded ids and DomainEvent envelope"
 
 **Files:** Create `packages/kernel/src/money.ts`, `packages/kernel/src/money.test.ts`.
 
-- [ ] **Step 1: Write the failing tests** (invariants + the penny-safe `allocate`)
+- [x] **Step 1: Write the failing tests** (invariants + the penny-safe `allocate`)
 
 `packages/kernel/src/money.test.ts`:
 ```ts
@@ -464,9 +464,9 @@ describe("Money", () => {
 });
 ```
 
-- [ ] **Step 2: Run it, see it fail** — Run: `pnpm --filter @erp/kernel test` → FAIL.
+- [x] **Step 2: Run it, see it fail** — Run: `pnpm --filter @erp/kernel test` → FAIL.
 
-- [ ] **Step 3: Implement `src/money.ts`**
+- [x] **Step 3: Implement `src/money.ts`**
 
 ```ts
 import Decimal from "decimal.js";
@@ -541,9 +541,9 @@ export class Money {
 }
 ```
 
-- [ ] **Step 4: Run it, see it pass** — Run: `pnpm --filter @erp/kernel test` → PASS.
+- [x] **Step 4: Run it, see it pass** — Run: `pnpm --filter @erp/kernel test` → PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 ```bash
 git add packages/kernel/src/money.ts packages/kernel/src/money.test.ts
 git commit -m "feat(kernel): Money value object with penny-safe allocate"
@@ -555,7 +555,7 @@ git commit -m "feat(kernel): Money value object with penny-safe allocate"
 
 **Files:** Create `packages/kernel/src/quantity.ts`, `packages/kernel/src/quantity.test.ts`.
 
-- [ ] **Step 1: Write the failing tests** (conversion + round-trip invariant)
+- [x] **Step 1: Write the failing tests** (conversion + round-trip invariant)
 
 `packages/kernel/src/quantity.test.ts`:
 ```ts
@@ -587,9 +587,9 @@ describe("UoM", () => {
 });
 ```
 
-- [ ] **Step 2: Run it, see it fail** — Run: `pnpm --filter @erp/kernel test` → FAIL.
+- [x] **Step 2: Run it, see it fail** — Run: `pnpm --filter @erp/kernel test` → FAIL.
 
-- [ ] **Step 3: Implement `src/quantity.ts`**
+- [x] **Step 3: Implement `src/quantity.ts`**
 
 ```ts
 import Decimal from "decimal.js";
@@ -632,9 +632,9 @@ export class UomRegistry {
 }
 ```
 
-- [ ] **Step 4: Run it, see it pass** — Run: `pnpm --filter @erp/kernel test` → PASS. Then `pnpm --filter @erp/kernel build` → PASS.
+- [x] **Step 4: Run it, see it pass** — Run: `pnpm --filter @erp/kernel test` → PASS. Then `pnpm --filter @erp/kernel build` → PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 ```bash
 git add packages/kernel/src/quantity.ts packages/kernel/src/quantity.test.ts packages/kernel/src/index.ts
 git commit -m "feat(kernel): Quantity and UoM conversion registry"
@@ -646,9 +646,9 @@ git commit -m "feat(kernel): Quantity and UoM conversion registry"
 
 **Files:** Create `packages/contracts/{package.json,tsconfig.json,vitest.config.ts}`, `packages/contracts/src/{index.ts,openapi.ts,openapi.test.ts}`.
 
-- [ ] **Step 1: Scaffolding** (mirror the kernel package.json; name `@erp/contracts`; deps: `zod: "catalog:"`).
+- [x] **Step 1: Scaffolding** (mirror the kernel package.json; name `@erp/contracts`; deps: `zod: "catalog:"`).
 
-- [ ] **Step 2: Write the failing test** (Zod 4's first-party `z.toJSONSchema`)
+- [x] **Step 2: Write the failing test** (Zod 4's first-party `z.toJSONSchema`)
 
 `packages/contracts/src/openapi.test.ts`:
 ```ts
@@ -670,9 +670,9 @@ describe("buildOpenApiDocument", () => {
 });
 ```
 
-- [ ] **Step 3: Run it, see it fail** — Run: `pnpm --filter @erp/contracts test` → FAIL.
+- [x] **Step 3: Run it, see it fail** — Run: `pnpm --filter @erp/contracts test` → FAIL.
 
-- [ ] **Step 4: Implement `src/openapi.ts`**
+- [x] **Step 4: Implement `src/openapi.ts`**
 
 ```ts
 import { z } from "zod";
@@ -697,9 +697,9 @@ export function buildOpenApiDocument(
 ```
 > `z.toJSONSchema(schema)` with no `target` emits draft-2020-12, which keeps `const` for `z.literal(...)` and matches the `openapi: "3.1.0"` document (OpenAPI 3.0's target would down-level `const` to `enum`, breaking the test). Context7-verify the exact signature on the pinned Zod 4 patch.
 
-- [ ] **Step 5: Run it, see it pass** — Run: `pnpm --filter @erp/contracts test` → PASS.
+- [x] **Step 5: Run it, see it pass** — Run: `pnpm --filter @erp/contracts test` → PASS.
 
-- [ ] **Step 6: Barrel + commit**
+- [x] **Step 6: Barrel + commit**
 
 `src/index.ts`: `export * from "./openapi.js";`
 ```bash
@@ -713,7 +713,7 @@ git commit -m "feat(contracts): Zod -> OpenAPI document builder"
 
 **Files:** Create `docker-compose.yml`.
 
-- [ ] **Step 1: Add Compose (Postgres 18 + pgvector image)**
+- [x] **Step 1: Add Compose (Postgres 18 + pgvector image)**
 
 `docker-compose.yml`:
 ```yaml
@@ -736,12 +736,12 @@ volumes:
 ```
 > Verify the exact `pgvector/pgvector:pg18` tag exists at execution; else use `postgres:18` + add the pgvector extension in a later phase.
 
-- [ ] **Step 2: Bring it up and verify**
+- [x] **Step 2: Bring it up and verify**
 
 Run: `docker compose up -d && docker compose ps`
 Expected: `postgres` healthy.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 ```bash
 git add docker-compose.yml
 git commit -m "chore: dev Postgres 18 + pgvector via docker compose"
@@ -753,7 +753,7 @@ git commit -m "chore: dev Postgres 18 + pgvector via docker compose"
 
 **Files:** Create `packages/db/{package.json,tsconfig.json,vitest.config.ts,drizzle.config.ts}`, `packages/db/src/{client.ts,migrate.ts}`, `packages/db/src/schema/{index.ts,platform.ts}`, `packages/db/src/migrate.int.test.ts`, and the generated `packages/db/drizzle/*`.
 
-- [ ] **Step 1: Scaffolding**
+- [x] **Step 1: Scaffolding**
 
 `packages/db/package.json`:
 ```json
@@ -784,7 +784,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({ test: { include: ["src/**/*.int.test.ts"], testTimeout: 120_000, hookTimeout: 120_000 } });
 ```
 
-- [ ] **Step 2: Schema — `platform_meta` (holds the schema version)**
+- [x] **Step 2: Schema — `platform_meta` (holds the schema version)**
 
 `packages/db/src/schema/platform.ts`:
 ```ts
@@ -800,7 +800,7 @@ export const platformMeta = pgTable("platform_meta", {
 ```
 `packages/db/src/schema/index.ts`: `export * from "./platform.js";`
 
-- [ ] **Step 3: `drizzle.config.ts`** (current API: `defineConfig` + `dialect`)
+- [x] **Step 3: `drizzle.config.ts`** (current API: `defineConfig` + `dialect`)
 
 ```ts
 import { defineConfig } from "drizzle-kit";
@@ -815,12 +815,12 @@ export default defineConfig({
 ```
 > `dotenv` is intentionally not imported here (it isn't a dep of `@erp/db`); `db:generate` doesn't connect to a DB.
 
-- [ ] **Step 4: Generate the first migration**
+- [x] **Step 4: Generate the first migration**
 
 Run: `pnpm --filter @erp/db db:generate`
 Expected: a SQL file appears under `packages/db/drizzle/` creating `platform_meta`. **Commit it** (migrations are checked in).
 
-- [ ] **Step 5: `client.ts` + `migrate.ts` (runner + boot gate)**
+- [x] **Step 5: `client.ts` + `migrate.ts` (runner + boot gate)**
 
 `packages/db/src/client.ts`:
 ```ts
@@ -869,7 +869,7 @@ export async function assertSchemaVersion(db: Db): Promise<void> {
 ```
 `packages/db/src/index.ts`: `export * from "./client.js"; export * from "./migrate.js"; export * as schema from "./schema/index.js";`
 
-- [ ] **Step 6: Write the failing integration test (Testcontainers real Postgres)**
+- [x] **Step 6: Write the failing integration test (Testcontainers real Postgres)**
 
 `packages/db/src/migrate.int.test.ts`:
 ```ts
@@ -905,14 +905,14 @@ describe("migrations + schema-version gate", () => {
 });
 ```
 
-- [ ] **Step 7: Run it, see it fail** — Run: `pnpm --filter @erp/db test:int` → FAIL first (before impl compiles) — ensure it then FAILs for the right reason, and that Docker is available for Testcontainers.
+- [x] **Step 7: Run it, see it fail** — Run: `pnpm --filter @erp/db test:int` → FAIL first (before impl compiles) — ensure it then FAILs for the right reason, and that Docker is available for Testcontainers.
 
-- [ ] **Step 8: Iterate to green** — build/typecheck the package, fix imports, re-run.
+- [x] **Step 8: Iterate to green** — build/typecheck the package, fix imports, re-run.
 
 Run: `pnpm --filter @erp/db test:int`
 Expected: PASS (2 tests).
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 ```bash
 git add packages/db
 git commit -m "feat(db): drizzle client, platform_meta migration, and schema-version boot gate"
@@ -924,7 +924,7 @@ git commit -m "feat(db): drizzle client, platform_meta migration, and schema-ver
 
 **Files:** Create `apps/api/{package.json,tsconfig.json,nest-cli.json,vitest.config.ts}`, `apps/api/src/{main.ts,app.module.ts}`, `apps/api/src/config/{env.ts,config.module.ts,env.test.ts}`, `apps/api/src/health/{health.controller.ts,health.module.ts,health.e2e.test.ts}`.
 
-- [ ] **Step 1: Scaffolding**
+- [x] **Step 1: Scaffolding**
 
 `apps/api/package.json`:
 ```json
@@ -983,7 +983,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 2: Write the failing test for config validation (fail-fast)**
+- [x] **Step 2: Write the failing test for config validation (fail-fast)**
 
 `apps/api/src/config/env.test.ts`:
 ```ts
@@ -1002,9 +1002,9 @@ describe("loadConfig", () => {
 });
 ```
 
-- [ ] **Step 3: Run it, see it fail** — Run: `pnpm --filter @erp/api test` → FAIL.
+- [x] **Step 3: Run it, see it fail** — Run: `pnpm --filter @erp/api test` → FAIL.
 
-- [ ] **Step 4: Implement `src/config/env.ts`**
+- [x] **Step 4: Implement `src/config/env.ts`**
 
 ```ts
 import { z } from "zod";
@@ -1029,9 +1029,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 }
 ```
 
-- [ ] **Step 5: Run it, see it pass** — Run: `pnpm --filter @erp/api test` → PASS.
+- [x] **Step 5: Run it, see it pass** — Run: `pnpm --filter @erp/api test` → PASS.
 
-- [ ] **Step 6: Config module + app module**
+- [x] **Step 6: Config module + app module**
 
 `apps/api/src/config/config.module.ts`:
 ```ts
@@ -1057,7 +1057,7 @@ import { HealthModule } from "./health/health.module.js";
 export class AppModule {}
 ```
 
-- [ ] **Step 7: Write the failing e2e test for `/health`**
+- [x] **Step 7: Write the failing e2e test for `/health`**
 
 `apps/api/src/health/health.e2e.test.ts`:
 ```ts
@@ -1085,9 +1085,9 @@ describe("health (e2e)", () => {
 });
 ```
 
-- [ ] **Step 8: Run it, see it fail** — Run: `pnpm --filter @erp/api test` → FAIL.
+- [x] **Step 8: Run it, see it fail** — Run: `pnpm --filter @erp/api test` → FAIL.
 
-- [ ] **Step 9: Implement health module + controller + `main.ts`**
+- [x] **Step 9: Implement health module + controller + `main.ts`**
 
 `apps/api/src/health/health.controller.ts`:
 ```ts
@@ -1124,14 +1124,14 @@ async function bootstrap() {
 void bootstrap();
 ```
 
-- [ ] **Step 10: Run it, see it pass** — Run: `pnpm --filter @erp/api test` → PASS.
+- [x] **Step 10: Run it, see it pass** — Run: `pnpm --filter @erp/api test` → PASS.
 
-- [ ] **Step 11: Manual smoke against dev Postgres**
+- [x] **Step 11: Manual smoke against dev Postgres**
 
 Run: `docker compose up -d && pnpm --filter @erp/api build && node apps/api/dist/main.js`
 Then: `curl -s localhost:3000/health` → Expected: `{"status":"ok"}`. Stop the process.
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 ```bash
 git add apps/api
 git commit -m "feat(api): NestJS bootstrap, Zod-validated config (fail-fast), /health"
@@ -1145,7 +1145,7 @@ git commit -m "feat(api): NestJS bootstrap, Zod-validated config (fail-fast), /h
 
 **Files:** Create `.dependency-cruiser.cjs`, `.husky/pre-commit`; modify root `package.json` (lint-staged config).
 
-- [ ] **Step 1: Write the boundary rules**
+- [x] **Step 1: Write the boundary rules**
 
 `.dependency-cruiser.cjs`:
 ```js
@@ -1195,12 +1195,12 @@ module.exports = {
 > Before Phase 2 introduces real cross-package `@erp/*` imports, confirm `tsConfig` (+ `enhancedResolveOptions` if needed) lets dependency-cruiser resolve `.js`→`.ts` specifiers and workspace package names — otherwise the deep-import rules stay exit 0 but under-enforced.
 > `from.path` captures the package name as `$1`; `to.pathNot: "^packages/$1/"` lets a package import its OWN `src` (relative internal imports) while blocking deep imports into *other* packages' internals — `src/index` and `*.test.ts` are always allowed. In Phase 1 no package imports another `@erp/*`, so this stays clean (exit 0). Verify the capture-group reference resolves as expected (dist vs src) at execution.
 
-- [ ] **Step 2: Verify boundaries pass on the current tree**
+- [x] **Step 2: Verify boundaries pass on the current tree**
 
 Run: `pnpm boundaries`
 Expected: no violations (exit 0). Fix any real violation surfaced.
 
-- [ ] **Step 3: Husky + lint-staged pre-commit**
+- [x] **Step 3: Husky + lint-staged pre-commit**
 
 Run: `pnpm exec husky init`
 `.husky/pre-commit`:
@@ -1212,7 +1212,7 @@ Add to root `package.json`:
 "lint-staged": { "*.{ts,tsx,js,json,md}": "biome check --write --no-errors-on-unmatched" }
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 ```bash
 git add .dependency-cruiser.cjs .husky package.json
 git commit -m "chore: dependency-cruiser boundaries + husky pre-commit"
@@ -1224,7 +1224,7 @@ git commit -m "chore: dependency-cruiser boundaries + husky pre-commit"
 
 **Files:** Create `.github/workflows/ci.yml`.
 
-- [ ] **Step 1: Write the workflow** (Docker is available on `ubuntu-latest` for Testcontainers)
+- [x] **Step 1: Write the workflow** (Docker is available on `ubuntu-latest` for Testcontainers)
 
 `.github/workflows/ci.yml`:
 ```yaml
@@ -1249,12 +1249,12 @@ jobs:
       - run: pnpm build
 ```
 
-- [ ] **Step 2: Verify locally that each command the CI runs is green**
+- [x] **Step 2: Verify locally that each command the CI runs is green**
 
 Run (in order): `pnpm typecheck && pnpm lint && pnpm boundaries && pnpm test && pnpm -r test:int && pnpm build`
 Expected: all green.
 
-- [ ] **Step 3: Commit, push, open PR**
+- [x] **Step 3: Commit, push, open PR**
 ```bash
 git add .github/workflows/ci.yml
 git commit -m "ci: typecheck, lint, boundaries, unit, integration, build"
@@ -1262,7 +1262,7 @@ git push -u origin phase-01-skeleton
 ```
 Then open a PR to `main` (via the github MCP or `gh pr create`) and confirm CI is green.
 
-- [ ] **Step 4: Update plan + journal**
+- [x] **Step 4: Update plan + journal**
 - Set this plan's Status → ✅ and check off tasks.
 - Append a `PROGRESS.md` entry (what shipped, CI green, next = Phase 2 correctness core).
 - Add `D-013` to `DECISIONS.md` if any implementation decision diverged from the plan (e.g., Postgres image tag, Vitest/SWC setup).
@@ -1270,14 +1270,14 @@ Then open a PR to `main` (via the github MCP or `gh pr create`) and confirm CI i
 ---
 
 ## Verification (Definition of Done for Phase 1)
-- [ ] `pnpm install` clean; workspace resolves; versions pinned in the catalog (Context7-verified)
-- [ ] `@erp/kernel` unit tests green: Money (incl. `allocate` sums back), UoM round-trip, DomainEvent envelope
-- [ ] `@erp/contracts` generates OpenAPI component schemas from Zod
-- [ ] `@erp/db` **integration** test green on a **real Postgres (Testcontainers)**: migrations apply, schema-version gate passes, and **fails closed on mismatch**
-- [ ] `apps/api` boots; config **fails fast** on bad env; `GET /health` → `{status:"ok"}` (e2e)
-- [ ] `pnpm boundaries` passes; Husky pre-commit active
-- [ ] CI green on the PR (typecheck · lint · boundaries · unit · integration · build)
-- [ ] Plan status + `journal/PROGRESS.md` + `journal/DECISIONS.md` updated; PR opened to `main`
+- [x] `pnpm install` clean; workspace resolves; versions pinned in the catalog (Context7-verified)
+- [x] `@erp/kernel` unit tests green: Money (incl. `allocate` sums back), UoM round-trip, DomainEvent envelope
+- [x] `@erp/contracts` generates OpenAPI component schemas from Zod
+- [x] `@erp/db` **integration** test green on a **real Postgres (Testcontainers)**: migrations apply, schema-version gate passes, and **fails closed on mismatch**
+- [x] `apps/api` boots; config **fails fast** on bad env; `GET /health` → `{status:"ok"}` (e2e)
+- [x] `pnpm boundaries` passes; Husky pre-commit active
+- [x] CI green on the PR (typecheck · lint · boundaries · unit · integration · build)
+- [x] Plan status + `journal/PROGRESS.md` + `journal/DECISIONS.md` updated; PR opened to `main`
 
 ## Risks / open questions
 - **ESM/CJS module strategy.** The shared packages are ESM (`type: module`); `apps/api` (NestJS) defaults to CommonJS. Phase-1's api (health + config) imports no `@erp/*` package, so this is inert now. **Before the api imports any `@erp/*` package** (the `/ready` follow-up / Phase 2), decide the strategy — recommended: **all-ESM** (set `apps/api` `type: module`, verify NestJS + SWC boot under ESM), or ship the shared packages **dual-format** (CJS+ESM). Importing an ESM-only package from CJS fails (TS1479 / `ERR_REQUIRE_ESM`).
@@ -1288,3 +1288,6 @@ Then open a PR to `main` (via the github MCP or `gh pr create`) and confirm CI i
 
 ## Progress log
 - 2026-07-16: Plan written (Context7-verified Drizzle/Zod/NestJS APIs). Not yet started. Next: execute Task 0 on a `phase-01-skeleton` branch.
+- 2026-07-17: Executed Tasks 0–7 via subagent-driven TDD on `phase-01-skeleton` (8 commits: hygiene → workspace → kernel → contracts → Compose → db). Review corrected `Money.allocate` (D-015) and hardened the db boot-gate test; deviations D-013–D-017 recorded. Next: Tasks 8–10 + PR to `main`.
+- 2026-07-17: Executed Tasks 8–10 (`apps/api` boot + fail-fast config + `/health`; dependency-cruiser boundaries + Husky; CI workflow). All CI commands green locally; 12 commits pushed. D-018 recorded. **Phase 1 implementation complete** — PR to `main` pending (gh/MCP unavailable this session; user opens it, CI runs on PR open).
+- 2026-07-18: PR #1 opened to `main`; **CI green** (`build-test` ✓ on `pull_request`) + follow-up `tsconfig` noEmit fix (`da2589b`). Phase 1 **complete**, ready to merge. Next: brainstorm → write the Phase 2 plan (correctness core).
