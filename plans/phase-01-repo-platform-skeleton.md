@@ -9,7 +9,7 @@
 **Tech Stack:** pnpm 10 (workspaces + catalog) · TypeScript · NestJS 11 · Drizzle ORM 0.45 + drizzle-kit 0.31 · PostgreSQL 18 (+ pgvector image) · Zod 4 · decimal.js · Vitest + Testcontainers · Biome + dependency-cruiser + Husky · GitHub Actions.
 
 - **Implements:** spec §1, §2.1, §4, §7 (tenancy/config seams), §8 (event envelope, config/flags) — [2026-07-16-erp-ai-native-system-design.md](../docs/superpowers/specs/2026-07-16-erp-ai-native-system-design.md)
-- **Status:** ✅ implemented (Tasks 0–10), pushed to `phase-01-skeleton`; local CI all-green (typecheck · lint · boundaries · 22 unit · 2 db integration · build). ⏳ PR to `main` + CI-green confirmation pending — **user opens the PR** (no gh CLI / github MCP this session; CI runs on PR open).
+- **Status:** ✅ **complete** — Tasks 0–10 on `phase-01-skeleton` (14 commits); **PR #1 open to `main`, CI green** (`build-test` ✓ on the `pull_request` trigger). Ready to merge. Next: Phase 2 — correctness core.
 - **Created:** 2026-07-16 · **Last updated:** 2026-07-17
 - **Depends on:** — (greenfield; git already initialized on `main`, remote → GitHub `Kitesurf_ERP`)
 
@@ -1254,7 +1254,7 @@ jobs:
 Run (in order): `pnpm typecheck && pnpm lint && pnpm boundaries && pnpm test && pnpm -r test:int && pnpm build`
 Expected: all green.
 
-- [ ] **Step 3: Commit, push, open PR**
+- [x] **Step 3: Commit, push, open PR**
 ```bash
 git add .github/workflows/ci.yml
 git commit -m "ci: typecheck, lint, boundaries, unit, integration, build"
@@ -1276,8 +1276,8 @@ Then open a PR to `main` (via the github MCP or `gh pr create`) and confirm CI i
 - [x] `@erp/db` **integration** test green on a **real Postgres (Testcontainers)**: migrations apply, schema-version gate passes, and **fails closed on mismatch**
 - [x] `apps/api` boots; config **fails fast** on bad env; `GET /health` → `{status:"ok"}` (e2e)
 - [x] `pnpm boundaries` passes; Husky pre-commit active
-- [ ] CI green on the PR (typecheck · lint · boundaries · unit · integration · build)
-- [ ] Plan status + `journal/PROGRESS.md` + `journal/DECISIONS.md` updated; PR opened to `main`
+- [x] CI green on the PR (typecheck · lint · boundaries · unit · integration · build)
+- [x] Plan status + `journal/PROGRESS.md` + `journal/DECISIONS.md` updated; PR opened to `main`
 
 ## Risks / open questions
 - **ESM/CJS module strategy.** The shared packages are ESM (`type: module`); `apps/api` (NestJS) defaults to CommonJS. Phase-1's api (health + config) imports no `@erp/*` package, so this is inert now. **Before the api imports any `@erp/*` package** (the `/ready` follow-up / Phase 2), decide the strategy — recommended: **all-ESM** (set `apps/api` `type: module`, verify NestJS + SWC boot under ESM), or ship the shared packages **dual-format** (CJS+ESM). Importing an ESM-only package from CJS fails (TS1479 / `ERR_REQUIRE_ESM`).
@@ -1290,3 +1290,4 @@ Then open a PR to `main` (via the github MCP or `gh pr create`) and confirm CI i
 - 2026-07-16: Plan written (Context7-verified Drizzle/Zod/NestJS APIs). Not yet started. Next: execute Task 0 on a `phase-01-skeleton` branch.
 - 2026-07-17: Executed Tasks 0–7 via subagent-driven TDD on `phase-01-skeleton` (8 commits: hygiene → workspace → kernel → contracts → Compose → db). Review corrected `Money.allocate` (D-015) and hardened the db boot-gate test; deviations D-013–D-017 recorded. Next: Tasks 8–10 + PR to `main`.
 - 2026-07-17: Executed Tasks 8–10 (`apps/api` boot + fail-fast config + `/health`; dependency-cruiser boundaries + Husky; CI workflow). All CI commands green locally; 12 commits pushed. D-018 recorded. **Phase 1 implementation complete** — PR to `main` pending (gh/MCP unavailable this session; user opens it, CI runs on PR open).
+- 2026-07-18: PR #1 opened to `main`; **CI green** (`build-test` ✓ on `pull_request`) + follow-up `tsconfig` noEmit fix (`da2589b`). Phase 1 **complete**, ready to merge. Next: brainstorm → write the Phase 2 plan (correctness core).
