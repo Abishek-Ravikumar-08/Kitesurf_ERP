@@ -8,6 +8,7 @@ export default defineConfig({
   // "./src/schema/*.ts" glob would re-include index.ts and hit the same resolution error.
   schema: [
     "./src/schema/audit.ts",
+    "./src/schema/outbox.ts",
     "./src/schema/platform.ts",
     "./src/schema/rls.ts",
     "./src/schema/tenancy.ts",
