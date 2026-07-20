@@ -9,7 +9,7 @@
 **Tech Stack:** everything Phase 1 pinned, plus **pg-boss 12** (jobs/cron) and **fast-check 4** (property tests). PostgreSQL RLS with `FORCE ROW LEVEL SECURITY`; Drizzle `pgSchema`/`pgPolicy`/`pgRole` (Context7-verified for 0.45.2); Node 24; all packages **ESM**.
 
 - **Implements:** spec §6 (correctness core), §7 (tenancy/RLS + audit tranche), §8 (envelope/versioning/idempotency), §9.1–9.2 (data/eventing), §10.2 (sub-sequencing) — [2026-07-16-erp-ai-native-system-design.md](../docs/superpowers/specs/2026-07-16-erp-ai-native-system-design.md)
-- **Status:** ✅ **approved** (user sign-off 2026-07-20 after a 3-iteration review loop) — **not yet executed**
+- **Status:** 🚧 in progress
 - **Created:** 2026-07-18 · **Last updated:** 2026-07-20
 - **Depends on:** Phase 1 (merged to `main` @ `ddd37f8`, PR #1)
 
