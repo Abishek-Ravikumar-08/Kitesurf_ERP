@@ -8,6 +8,20 @@ describe("stableStringify", () => {
       stableStringify({ a: { c: 3, d: 2 }, b: 1 }),
     );
   });
+  it("honors toJSON: Date serializes as its ISO string, deterministically", () => {
+    const iso = "2026-07-20T01:02:03.000Z";
+    expect(stableStringify({ d: new Date(iso) })).toBe(`{"d":"${iso}"}`);
+    expect(stableStringify({ d: new Date(iso) })).toBe(stableStringify({ d: new Date(iso) }));
+  });
+  it("maps undefined inside arrays to null (JSON semantics)", () => {
+    expect(stableStringify([undefined])).toBe("[null]");
+    expect(stableStringify([undefined])).not.toBe("[]");
+  });
+  it("throws on a root value that is not JSON-serializable", () => {
+    expect(() => stableStringify(undefined)).toThrow(TypeError);
+    expect(() => stableStringify(undefined)).toThrow(/not JSON-serializable/);
+    expect(() => stableStringify(() => 1)).toThrow(TypeError);
+  });
   it("property: any two objects with the same entries stringify identically", () => {
     fc.assert(
       fc.property(fc.dictionary(fc.string(), fc.jsonValue()), (obj) => {

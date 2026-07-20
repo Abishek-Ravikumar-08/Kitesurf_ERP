@@ -135,6 +135,25 @@ describe("hash-chained immutable audit", () => {
     );
   });
 
+  it("normalizes uuid case: an UPPERCASE tenantId appends a chain that verifies valid", async () => {
+    const upper = t.tenantId.toUpperCase();
+    await withTenantTx(t.handle.db, { tenantId: upper }, (tx) =>
+      appendAudit(tx, {
+        tenantId: upper,
+        aggregateType: "CaseAgg",
+        aggregateId: "c-1",
+        action: "created",
+        payload: { ok: true },
+      }),
+    );
+    const verdict = await verifyAuditChain(t.handle.db, {
+      tenantId: t.tenantId,
+      aggregateType: "CaseAgg",
+      aggregateId: "c-1",
+    });
+    expect(verdict).toEqual({ valid: true, length: 1 });
+  });
+
   it("RLS: a second tenant reads ZERO audit rows of the first", async () => {
     const tenantB = randomUUID();
     await t.handle.db.insert(schema.tenants).values({ id: tenantB, name: "tenant-b" });
