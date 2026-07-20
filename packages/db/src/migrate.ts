@@ -5,7 +5,7 @@ import type { Db } from "./client.js";
 import { platformMeta } from "./schema/platform.js";
 
 /** The version this code build expects the DB to be at. Bump when a migration ships. */
-export const EXPECTED_SCHEMA_VERSION = 4;
+export const EXPECTED_SCHEMA_VERSION = 5;
 
 const migrationsFolder = resolve(dirname(fileURLToPath(import.meta.url)), "../drizzle");
 

@@ -50,6 +50,20 @@
       "when": 1784573116066,
       "tag": "0006_outbox-rls-force",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1784578772275,
+      "tag": "0007_damp_snowbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1784578782114,
+      "tag": "0008_md-wh-rls-force",
+      "breakpoints": true
     }
   ]
 }
