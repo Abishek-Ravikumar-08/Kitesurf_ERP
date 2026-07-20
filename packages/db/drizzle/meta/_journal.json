@@ -8,6 +8,20 @@
       "when": 1784232631946,
       "tag": "0000_messy_radioactive_man",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784561466114,
+      "tag": "0001_natural_power_pack",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784561476792,
+      "tag": "0002_rls-force-and-grants",
+      "breakpoints": true
     }
   ]
 }
