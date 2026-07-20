@@ -191,9 +191,14 @@ describe("gapless number ranges", () => {
     );
     expect(gaps).toEqual([]);
 
-    // 2) The REAL crash-gap: an allocation COMMITTED but its document never materialized
-    //    (simulated by deleting the journal row as superuser — RLS bypass, bootstrap path).
-    //    detectGaps reports the hole; this is what "gaps are DETECTED, not prevented" means.
+    // 2) Journal/counter divergence: deleting a committed journal row as superuser (RLS
+    //    bypass, bootstrap path) models an out-of-band counter bump, journal corruption, or a
+    //    future flow that allocates in a separately committed tx (e.g. Phase-5 SAP
+    //    provisional-adopt). detectGaps detects exactly these journal holes — that is what
+    //    "gaps are DETECTED, not prevented" means. NOTE it does NOT model a lost document:
+    //    under the single-tx convention a lost document leaves the journal row intact
+    //    (dangling docRef), which detectGaps would NOT flag — a lost-document audit would
+    //    need a dangling-docRef check instead.
     for (let i = 0; i < 2; i++) {
       await withTenantTx(t.handle.db, { tenantId: t.tenantId }, (tx) =>
         allocateNumber(tx, { tenantId: t.tenantId, rangeKey, period: "" }),

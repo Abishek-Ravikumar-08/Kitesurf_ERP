@@ -44,6 +44,10 @@ export interface AllocateInput {
  * Allocate the next number under the counter row's lock. CONVENTION (spec §6): call this
  * as LATE as possible in the business transaction — the lock is held until commit, and a
  * later rollback is what turns an allocation into a gap.
+ *
+ * Lock-ordering rule: if the allocated number must appear in an audit payload, every flow
+ * touching that SAME shared audit aggregate must allocate before its first appendAudit
+ * (or none must) — mixing the two orders on a shared aggregate is an ABBA deadlock.
  */
 export async function allocateNumber(
   tx: Tx,
@@ -82,7 +86,9 @@ export async function allocateNumber(
   };
 }
 
-/** Holes between 1 and current_value with no journal row — every one must be explainable. */
+/** Holes between 1 and current_value with no journal row — every one must be explainable.
+ * O(current_value) scan — fine as an on-demand diagnostic; add a {fromValue,toValue}
+ * window before wiring a recurring production consumer (e.g. period-close checks). */
 export async function detectGaps(
   tx: Tx,
   ref: { tenantId: string; rangeKey: string; period?: string },
