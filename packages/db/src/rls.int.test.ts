@@ -80,12 +80,15 @@ describe("RLS is always-on and fail-closed", () => {
 
   it("ENABLE + FORCE row security are set on EVERY tenant table (catalog assertion)", async () => {
     // Proves FORCE is really active (test connections are superuser, which bypasses RLS —
-    // without this check the FORCE claim would rest on migration review alone). Scans all
-    // owner-named schemas so tables added by later tasks are covered automatically.
+    // without this check the FORCE claim would rest on migration review alone). Blocklist,
+    // not allowlist: scans every non-system schema so tables added by later tasks/phases are
+    // covered automatically ('public' intentionally exempts platform_meta; 'drizzle' exempts
+    // the migrations table). Includes partitioned tables (relkind 'p').
     const res = await handle.db.execute(sql`
       SELECT n.nspname || '.' || c.relname AS tbl
       FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE c.relkind = 'r' AND n.nspname IN ('platform', 'md', 'wh', 'fin')
+      WHERE c.relkind IN ('r', 'p')
+        AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'public', 'drizzle')
         AND NOT (c.relrowsecurity AND c.relforcerowsecurity)
     `);
     expect(res.rows).toEqual([]);

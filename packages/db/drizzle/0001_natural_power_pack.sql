@@ -1,6 +1,10 @@
 CREATE SCHEMA "platform";
 --> statement-breakpoint
-CREATE ROLE "app_rw";--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app_rw') THEN
+    CREATE ROLE "app_rw";
+  END IF;
+END $$;--> statement-breakpoint
 CREATE TABLE "platform"."tenants" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
