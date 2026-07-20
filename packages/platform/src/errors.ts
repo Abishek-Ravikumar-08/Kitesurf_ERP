@@ -50,6 +50,15 @@ export class VersionConflictError extends DomainError {
   }
 }
 
+/** An allocation against a number range that was never created (or is out of tenant). */
+export class NumberRangeNotFoundError extends DomainError {
+  readonly code = "NUMBER_RANGE_NOT_FOUND";
+  constructor(rangeKey: string, period: string) {
+    super(`number range ${rangeKey} (period ${JSON.stringify(period)}) not found`);
+    this.name = "NumberRangeNotFoundError";
+  }
+}
+
 /** An outbox event whose payload fails its registered contract schema. */
 export class InvalidEventPayloadError extends DomainError {
   readonly code = "INVALID_EVENT_PAYLOAD";

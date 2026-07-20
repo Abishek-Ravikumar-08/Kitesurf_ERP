@@ -9,6 +9,7 @@ export default defineConfig({
   schema: [
     "./src/schema/audit.ts",
     "./src/schema/masterdata.ts",
+    "./src/schema/numbering.ts",
     "./src/schema/outbox.ts",
     "./src/schema/stock.ts",
     "./src/schema/platform.ts",
