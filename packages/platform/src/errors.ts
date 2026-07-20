@@ -38,6 +38,18 @@ export class StockItemNotFoundError extends DomainError {
   }
 }
 
+/** An optimistic-lock failure: the row's version moved past the caller's expected version. */
+export class VersionConflictError extends DomainError {
+  readonly code = "VERSION_CONFLICT";
+  constructor(
+    public readonly expected: number,
+    public readonly actual: number,
+  ) {
+    super(`version conflict: expected ${expected}, actual ${actual}`);
+    this.name = "VersionConflictError";
+  }
+}
+
 /** An outbox event whose payload fails its registered contract schema. */
 export class InvalidEventPayloadError extends DomainError {
   readonly code = "INVALID_EVENT_PAYLOAD";

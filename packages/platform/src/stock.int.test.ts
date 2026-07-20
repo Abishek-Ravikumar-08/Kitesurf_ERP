@@ -9,9 +9,10 @@ import {
   InvalidEventPayloadError,
   InvalidQuantityError,
   ReservationNotActiveError,
+  VersionConflictError,
 } from "./errors.js";
 import { appendOutbox } from "./outbox.js";
-import { consume, getAvailable, release, reserve } from "./stock.js";
+import { adjustOnHand, consume, getAvailable, release, reserve } from "./stock.js";
 import { type TestDb, inParallel, startTestDb } from "./testkit.js";
 
 /** Seed a fresh material + stock item on the superuser handle (bootstrap path, bypasses RLS). */
@@ -380,6 +381,131 @@ describe("stock reservation / ATP", () => {
     expect(contextless.materials).toHaveLength(0);
     expect(contextless.items).toHaveLength(0);
     expect(contextless.reservations).toHaveLength(0);
+  });
+
+  it("stale version rejected: second adjust with the old expectedVersion throws VersionConflictError", async () => {
+    const itemId = await seedItem(t, "100");
+    const v = (await getItem(t, itemId)).version;
+
+    await withTenantTx(t.handle.db, { tenantId: t.tenantId }, (tx) =>
+      adjustOnHand(tx, {
+        tenantId: t.tenantId,
+        stockItemId: itemId,
+        delta: "5",
+        reason: "cycle count",
+        postingDate: "2026-07-15",
+        actor: null,
+        expectedVersion: v,
+      }),
+    );
+    let item = await getItem(t, itemId);
+    expect(item.version).toBe(v + 1);
+    expect(Number(item.onHand)).toBe(105);
+
+    const caught = await withTenantTx(t.handle.db, { tenantId: t.tenantId }, (tx) =>
+      adjustOnHand(tx, {
+        tenantId: t.tenantId,
+        stockItemId: itemId,
+        delta: "5",
+        reason: "cycle count",
+        postingDate: "2026-07-15",
+        actor: null,
+        expectedVersion: v, // stale — the row is now at v+1
+      }),
+    ).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(caught).toBeInstanceOf(VersionConflictError);
+    const conflict = caught as VersionConflictError;
+    expect(conflict.expected).toBe(v);
+    expect(conflict.actual).toBe(v + 1);
+    expect(conflict.message).toMatch(/version conflict/i);
+
+    // state reflects exactly ONE adjustment
+    item = await getItem(t, itemId);
+    expect(item.version).toBe(v + 1);
+    expect(Number(item.onHand)).toBe(105);
+    expect(await auditRows(t, itemId, "stock.adjust")).toHaveLength(1);
+    expect(await outboxRows(t, "StockAdjusted", itemId)).toHaveLength(1);
+  });
+
+  it("property: exactly one of N same-version concurrent writers wins", async () => {
+    await fc.assert(
+      fc.asyncProperty(fc.integer({ min: 3, max: 8 }), async (n) => {
+        const itemId = await seedItem(t, "1000");
+        const v = (await getItem(t, itemId)).version;
+        const results = await inParallel(
+          Array.from(
+            { length: n },
+            () => () =>
+              withTenantTx(t.handle.db, { tenantId: t.tenantId }, (tx) =>
+                adjustOnHand(tx, {
+                  tenantId: t.tenantId,
+                  stockItemId: itemId,
+                  delta: "1",
+                  reason: "prop",
+                  postingDate: "2026-07-15",
+                  actor: null,
+                  expectedVersion: v,
+                }),
+              ),
+          ),
+        );
+        const wins = results.filter((r) => r.status === "fulfilled").length;
+        const conflicts = results.filter(
+          (r) =>
+            r.status === "rejected" &&
+            /version conflict/i.test(String((r as PromiseRejectedResult).reason)),
+        ).length;
+        const item = await getItem(t, itemId);
+        return (
+          wins === 1 &&
+          conflicts === n - 1 &&
+          Number(item.onHand) === 1001 &&
+          item.version === v + 1
+        );
+      }),
+      { numRuns: 15 },
+    );
+  });
+
+  it("retry loop converges: N read-adjust-retry workers all succeed exactly once", async () => {
+    const n = 6;
+    const itemId = await seedItem(t, "500");
+    const initialVersion = (await getItem(t, itemId)).version;
+
+    const results = await inParallel(
+      Array.from({ length: n }, () => async () => {
+        for (let attempt = 0; attempt < 20; attempt++) {
+          const v = (await getItem(t, itemId)).version;
+          try {
+            await withTenantTx(t.handle.db, { tenantId: t.tenantId }, (tx) =>
+              adjustOnHand(tx, {
+                tenantId: t.tenantId,
+                stockItemId: itemId,
+                delta: "1",
+                reason: "retry worker",
+                postingDate: "2026-07-15",
+                actor: null,
+                expectedVersion: v,
+              }),
+            );
+            return; // succeeded exactly once — stop retrying
+          } catch (e) {
+            if (!(e instanceof VersionConflictError)) throw e;
+          }
+        }
+        throw new Error("worker did not converge within 20 attempts");
+      }),
+    );
+
+    expect(results.every((r) => r.status === "fulfilled")).toBe(true);
+    const item = await getItem(t, itemId);
+    expect(Number(item.onHand)).toBe(500 + n);
+    expect(item.version).toBe(initialVersion + n);
+    expect(await auditRows(t, itemId, "stock.adjust")).toHaveLength(n);
+    expect(await outboxRows(t, "StockAdjusted", itemId)).toHaveLength(n);
   });
 
   it("appendOutbox rejects a malformed StockReserved payload and writes NO row", async () => {

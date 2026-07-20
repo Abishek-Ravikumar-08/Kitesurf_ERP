@@ -7,6 +7,7 @@ import {
   InvalidQuantityError,
   ReservationNotActiveError,
   StockItemNotFoundError,
+  VersionConflictError,
 } from "./errors.js";
 import { appendOutbox } from "./outbox.js";
 
@@ -220,6 +221,11 @@ export interface AdjustOnHandInput {
   postingDate: string;
   actor: string | null;
   correlationId?: string;
+  /**
+   * Optimistic lock: when set, the UPDATE only applies if the row is still at this version.
+   * Stale → VersionConflictError — the execute-time version-guard pattern AI proposals reuse (spec §6).
+   */
+  expectedVersion?: number;
 }
 
 /** Adjust on-hand (goods receipt, cycle count, …) — guarded so it never strands reservations. */
@@ -236,15 +242,29 @@ export async function adjustOnHand(tx: Tx, input: AdjustOnHandInput): Promise<vo
       and(
         eq(schema.stockItems.id, input.stockItemId),
         sql`(${schema.stockItems.allowNegative} OR (${schema.stockItems.onHand} + ${input.delta}::numeric) >= ${schema.stockItems.reserved})`,
+        ...(input.expectedVersion !== undefined
+          ? [eq(schema.stockItems.version, input.expectedVersion)]
+          : []),
       ),
     )
     .returning({ id: schema.stockItems.id });
   if (updated.length === 0) {
-    const exists = await tx
-      .select({ id: schema.stockItems.id })
+    // Disambiguate: (a) row missing → NotFound, (b) version moved → VersionConflict
+    // with the ACTUAL current version, (c) version fine but stock guard failed → InsufficientStock.
+    const rows = await tx
+      .select({
+        id: schema.stockItems.id,
+        version: schema.stockItems.version,
+        onHand: schema.stockItems.onHand,
+        reserved: schema.stockItems.reserved,
+        allowNegative: schema.stockItems.allowNegative,
+      })
       .from(schema.stockItems)
       .where(eq(schema.stockItems.id, input.stockItemId));
-    if (exists.length === 0) throw new StockItemNotFoundError(input.stockItemId);
+    const row = rows[0];
+    if (!row) throw new StockItemNotFoundError(input.stockItemId);
+    if (input.expectedVersion !== undefined && row.version !== input.expectedVersion)
+      throw new VersionConflictError(input.expectedVersion, row.version);
     throw new InsufficientStockError(input.stockItemId, input.delta);
   }
   await appendAudit(tx, {
