@@ -6,4 +6,7 @@ async function bootstrap() {
   const ctx = await NestFactory.createApplicationContext(WorkerModule);
   ctx.enableShutdownHooks();
 }
-void bootstrap();
+bootstrap().catch((err) => {
+  console.error("worker bootstrap failed:", err);
+  process.exit(1);
+});

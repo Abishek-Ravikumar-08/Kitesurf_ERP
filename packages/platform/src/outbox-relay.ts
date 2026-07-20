@@ -21,8 +21,17 @@ export class ConsumerRegistry {
  * Drain one batch: claim unrelayed rows (SKIP LOCKED — safe with concurrent relays),
  * archive each (idempotent), fan out one job per consumer queue (singletonKey = eventId
  * gives best-effort dedupe while queued; consumers MUST be idempotent — delivery is
- * at-least-once by design), then mark relayed. Runs on the worker's owner connection:
- * cross-tenant infrastructure that never mutates domain tables.
+ * at-least-once by design), then mark relayed. Runs on the worker's superuser/BYPASSRLS
+ * connection (FORCE RLS means a mere table owner would silently see zero rows):
+ * cross-tenant infrastructure that never mutates domain tables. The superuser-or-BYPASSRLS
+ * requirement is a Phase-3 provisioning-runbook item.
+ *
+ * TODO(Phase 3): per-row failure quarantine + attempt cap — archive+fan-out+mark share one
+ * transaction over an ORDER BY created_at claim, so a deterministically-failing row
+ * (boss.send or archive INSERT throwing) currently rolls back the whole batch each tick,
+ * head-of-line blocks every later row, and wedges the relay; nothing relays again. Phase 2
+ * is safe (empty PROD_REGISTRY → send never runs in prod), but this must land with the
+ * first real consumer registration.
  */
 export async function relayOutboxBatch(
   db: Db,
@@ -45,7 +54,9 @@ export async function relayOutboxBatch(
         ON CONFLICT (id) DO NOTHING
       `);
       // Jobs carry the CANONICAL §8 DomainEvent envelope (camelCase), not the raw SQL row —
-      // this is the wire contract Phase-3 consumers build against.
+      // this is the wire contract Phase-3 consumers build against. Consumers must not assume
+      // the archive row is committed/visible when the job arrives (pg-boss delivers on its
+      // own connection; the relay tx may still be open or may roll back and retry).
       // drizzle's raw execute() bypasses pg's Date parser: timestamptz comes back as a
       // string ("2026-07-20 10:00:00+00") — normalize to the envelope's ISO-8601 form.
       const occurredAtRaw = r.occurred_at as string | Date;
