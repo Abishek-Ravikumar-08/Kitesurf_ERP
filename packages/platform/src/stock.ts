@@ -4,10 +4,22 @@ import { and, eq, sql } from "drizzle-orm";
 import { appendAudit } from "./audit.js";
 import {
   InsufficientStockError,
+  InvalidQuantityError,
   ReservationNotActiveError,
   StockItemNotFoundError,
 } from "./errors.js";
 import { appendOutbox } from "./outbox.js";
+
+const QTY_RE = /^\d+(\.\d+)?$/;
+/** Positive decimal string (matches the contracts' qty grammar, sign excluded). */
+function assertPositiveQty(qty: string): void {
+  if (!QTY_RE.test(qty) || Number(qty) === 0) throw new InvalidQuantityError(qty);
+}
+const SIGNED_QTY_RE = /^-?\d+(\.\d+)?$/;
+/** Signed decimal string (zero allowed — a no-op adjust is legal). */
+function assertSignedQty(delta: string): void {
+  if (!SIGNED_QTY_RE.test(delta)) throw new InvalidQuantityError(delta);
+}
 
 export interface ReserveInput {
   tenantId: string;
@@ -21,6 +33,7 @@ export interface ReserveInput {
 
 /** Atomic reservation: serialized decrement via a guarded UPDATE — never an async round-trip (spec §5 rule 3). */
 export async function reserve(tx: Tx, input: ReserveInput): Promise<{ reservationId: string }> {
+  assertPositiveQty(input.qty);
   const updated = await tx
     .update(schema.stockItems)
     .set({
@@ -211,6 +224,7 @@ export interface AdjustOnHandInput {
 
 /** Adjust on-hand (goods receipt, cycle count, …) — guarded so it never strands reservations. */
 export async function adjustOnHand(tx: Tx, input: AdjustOnHandInput): Promise<void> {
+  assertSignedQty(input.delta);
   const updated = await tx
     .update(schema.stockItems)
     .set({

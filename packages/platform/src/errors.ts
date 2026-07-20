@@ -2,6 +2,15 @@ export abstract class DomainError extends Error {
   abstract readonly code: string;
 }
 
+/** A quantity/delta string that is not a well-formed decimal (or violates the sign rule). */
+export class InvalidQuantityError extends DomainError {
+  readonly code = "INVALID_QUANTITY";
+  constructor(qty: string) {
+    super(`invalid quantity: ${JSON.stringify(qty)}`);
+    this.name = "InvalidQuantityError";
+  }
+}
+
 /** A reserve/adjust that would violate the item's negative-stock policy. */
 export class InsufficientStockError extends DomainError {
   readonly code = "INSUFFICIENT_STOCK";

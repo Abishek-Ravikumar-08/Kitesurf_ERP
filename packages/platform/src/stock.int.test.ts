@@ -4,7 +4,12 @@ import { asTenantId, createEvent } from "@erp/kernel";
 import { and, eq, sql } from "drizzle-orm";
 import fc from "fast-check";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { InsufficientStockError, InvalidEventPayloadError } from "./errors.js";
+import {
+  InsufficientStockError,
+  InvalidEventPayloadError,
+  InvalidQuantityError,
+  ReservationNotActiveError,
+} from "./errors.js";
 import { appendOutbox } from "./outbox.js";
 import { consume, getAvailable, release, reserve } from "./stock.js";
 import { type TestDb, inParallel, startTestDb } from "./testkit.js";
@@ -207,6 +212,81 @@ describe("stock reservation / ATP", () => {
     expect(consumed?.status).toBe("consumed");
     expect(await auditRows(t, itemId, "stock.consume")).toHaveLength(1);
     expect(await outboxRows(t, "StockReservationConsumed", itemId)).toHaveLength(1);
+  });
+
+  it("double release: second release throws ReservationNotActiveError, counters unchanged", async () => {
+    const itemId = await seedItem(t, "100");
+    const r = await withTenantTx(t.handle.db, { tenantId: t.tenantId }, (tx) =>
+      reserve(tx, {
+        tenantId: t.tenantId,
+        stockItemId: itemId,
+        qty: "10",
+        kind: "hard",
+        actor: null,
+      }),
+    );
+    await withTenantTx(t.handle.db, { tenantId: t.tenantId }, (tx) =>
+      release(tx, { tenantId: t.tenantId, reservationId: r.reservationId, actor: null }),
+    );
+    await expect(
+      withTenantTx(t.handle.db, { tenantId: t.tenantId }, (tx) =>
+        release(tx, { tenantId: t.tenantId, reservationId: r.reservationId, actor: null }),
+      ),
+    ).rejects.toBeInstanceOf(ReservationNotActiveError);
+    const item = await getItem(t, itemId);
+    expect(Number(item.reserved)).toBe(0);
+    expect(Number(item.onHand)).toBe(100);
+    // exactly one release audit/event — the failed second call wrote nothing
+    expect(await auditRows(t, itemId, "stock.release")).toHaveLength(1);
+    expect(await outboxRows(t, "StockReservationReleased", itemId)).toHaveLength(1);
+  });
+
+  it('reserve with qty "-5" throws InvalidQuantityError before touching SQL, nothing written', async () => {
+    const itemId = await seedItem(t, "100");
+    await expect(
+      withTenantTx(t.handle.db, { tenantId: t.tenantId }, (tx) =>
+        reserve(tx, {
+          tenantId: t.tenantId,
+          stockItemId: itemId,
+          qty: "-5",
+          kind: "hard",
+          actor: null,
+        }),
+      ),
+    ).rejects.toBeInstanceOf(InvalidQuantityError);
+    const item = await getItem(t, itemId);
+    expect(Number(item.reserved)).toBe(0);
+    const ledger = await t.handle.db
+      .select()
+      .from(schema.stockReservations)
+      .where(eq(schema.stockReservations.stockItemId, itemId));
+    expect(ledger).toHaveLength(0);
+    expect(await auditRows(t, itemId, "stock.reserve")).toHaveLength(0);
+    expect(await outboxRows(t, "StockReserved", itemId)).toHaveLength(0);
+  });
+
+  it('reserve with qty "abc" throws InvalidQuantityError before touching SQL, nothing written', async () => {
+    const itemId = await seedItem(t, "100");
+    await expect(
+      withTenantTx(t.handle.db, { tenantId: t.tenantId }, (tx) =>
+        reserve(tx, {
+          tenantId: t.tenantId,
+          stockItemId: itemId,
+          qty: "abc",
+          kind: "hard",
+          actor: null,
+        }),
+      ),
+    ).rejects.toBeInstanceOf(InvalidQuantityError);
+    const item = await getItem(t, itemId);
+    expect(Number(item.reserved)).toBe(0);
+    const ledger = await t.handle.db
+      .select()
+      .from(schema.stockReservations)
+      .where(eq(schema.stockReservations.stockItemId, itemId));
+    expect(ledger).toHaveLength(0);
+    expect(await auditRows(t, itemId, "stock.reserve")).toHaveLength(0);
+    expect(await outboxRows(t, "StockReserved", itemId)).toHaveLength(0);
   });
 
   it("getAvailable = on_hand - reserved", async () => {
