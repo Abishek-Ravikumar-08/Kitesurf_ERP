@@ -60,38 +60,38 @@ export class NumberRangeNotFoundError extends DomainError {
 }
 
 /** A close/reopen against a fiscal period that does not exist (or is out of tenant). */
-export class PeriodNotFoundError extends DomainError {
+export class FiscalPeriodNotFoundError extends DomainError {
   readonly code = "FISCAL_PERIOD_NOT_FOUND";
   constructor(periodId: string) {
     super(`fiscal period ${periodId} not found`);
-    this.name = "PeriodNotFoundError";
+    this.name = "FiscalPeriodNotFoundError";
   }
 }
 
 /** A posting date covered by NO fiscal period — the gate fails closed. */
-export class PeriodNotOpenError extends DomainError {
+export class FiscalPeriodNotOpenError extends DomainError {
   readonly code = "FISCAL_PERIOD_NOT_OPEN";
   constructor(postingDate: string) {
     super(`no fiscal period covers posting date ${postingDate}`);
-    this.name = "PeriodNotOpenError";
+    this.name = "FiscalPeriodNotOpenError";
   }
 }
 
 /** A posting into (or a re-close of) a fiscal period that is closed. */
-export class PeriodClosedError extends DomainError {
+export class FiscalPeriodClosedError extends DomainError {
   readonly code = "FISCAL_PERIOD_CLOSED";
   constructor(ref: string) {
     super(`fiscal period is closed: ${ref}`);
-    this.name = "PeriodClosedError";
+    this.name = "FiscalPeriodClosedError";
   }
 }
 
 /** A reopen against a fiscal period that is not closed (already open). */
-export class PeriodNotClosedError extends DomainError {
+export class FiscalPeriodNotClosedError extends DomainError {
   readonly code = "FISCAL_PERIOD_NOT_CLOSED";
   constructor(periodId: string) {
     super(`fiscal period ${periodId} is not closed`);
-    this.name = "PeriodNotClosedError";
+    this.name = "FiscalPeriodNotClosedError";
   }
 }
 

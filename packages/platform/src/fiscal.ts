@@ -3,10 +3,10 @@ import { asTenantId, asUserId, createEvent, newId } from "@erp/kernel";
 import { and, eq, sql } from "drizzle-orm";
 import { appendAudit } from "./audit.js";
 import {
-  PeriodClosedError,
-  PeriodNotClosedError,
-  PeriodNotFoundError,
-  PeriodNotOpenError,
+  FiscalPeriodClosedError,
+  FiscalPeriodNotClosedError,
+  FiscalPeriodNotFoundError,
+  FiscalPeriodNotOpenError,
   VersionConflictError,
 } from "./errors.js";
 import { appendOutbox } from "./outbox.js";
@@ -65,8 +65,8 @@ export interface PeriodTransitionInput {
 
 /**
  * Close a period: guarded UPDATE open → closed. 0 rows → disambiguating re-select:
- * missing → PeriodNotFoundError; version moved → VersionConflictError (with the actual
- * version); already closed → PeriodClosedError.
+ * missing → FiscalPeriodNotFoundError; version moved → VersionConflictError (with the actual
+ * version); already closed → FiscalPeriodClosedError.
  */
 export async function closePeriod(tx: Tx, input: PeriodTransitionInput): Promise<void> {
   const updated = await tx
@@ -96,10 +96,10 @@ export async function closePeriod(tx: Tx, input: PeriodTransitionInput): Promise
       .from(schema.fiscalPeriods)
       .where(eq(schema.fiscalPeriods.id, input.periodId));
     const current = rows[0];
-    if (!current) throw new PeriodNotFoundError(input.periodId);
+    if (!current) throw new FiscalPeriodNotFoundError(input.periodId);
     if (current.version !== input.expectedVersion)
       throw new VersionConflictError(input.expectedVersion, current.version);
-    throw new PeriodClosedError(input.periodId);
+    throw new FiscalPeriodClosedError(input.periodId);
   }
   await appendAudit(tx, {
     tenantId: input.tenantId,
@@ -126,7 +126,7 @@ export async function closePeriod(tx: Tx, input: PeriodTransitionInput): Promise
 
 /**
  * Reopen a closed period (mirrors closePeriod): guarded UPDATE closed → open, clearing
- * closedAt/closedBy. Already open → PeriodNotClosedError (NOT PeriodNotOpenError — that
+ * closedAt/closedBy. Already open → FiscalPeriodNotClosedError (NOT FiscalPeriodNotOpenError — that
  * means "no open period covers a posting date").
  */
 export async function reopenPeriod(tx: Tx, input: PeriodTransitionInput): Promise<void> {
@@ -157,10 +157,10 @@ export async function reopenPeriod(tx: Tx, input: PeriodTransitionInput): Promis
       .from(schema.fiscalPeriods)
       .where(eq(schema.fiscalPeriods.id, input.periodId));
     const current = rows[0];
-    if (!current) throw new PeriodNotFoundError(input.periodId);
+    if (!current) throw new FiscalPeriodNotFoundError(input.periodId);
     if (current.version !== input.expectedVersion)
       throw new VersionConflictError(input.expectedVersion, current.version);
-    throw new PeriodNotClosedError(input.periodId);
+    throw new FiscalPeriodNotClosedError(input.periodId);
   }
   await appendAudit(tx, {
     tenantId: input.tenantId,
@@ -187,9 +187,19 @@ export async function reopenPeriod(tx: Tx, input: PeriodTransitionInput): Promis
 
 /**
  * The posting gate: resolve the period covering `postingDate` (inclusive bounds) and
- * require it OPEN. Fails CLOSED — no period at all → PeriodNotOpenError; a closed
- * period → PeriodClosedError. RLS scopes the lookup; the explicit tenant filter is
+ * require it OPEN. Fails CLOSED — no period at all → FiscalPeriodNotOpenError; a closed
+ * period → FiscalPeriodClosedError. RLS scopes the lookup; the explicit tenant filter is
  * belt-and-braces.
+ *
+ * LOCKING CONTRACT: the select takes FOR SHARE on the period row. closePeriod's UPDATE
+ * acquires FOR NO KEY UPDATE, which CONFLICTS with FOR SHARE — so an in-flight close
+ * blocks the gate until it commits (the gate then sees 'closed' and throws), and an
+ * in-flight posting blocks the close until the posting commits. Without this, under
+ * READ COMMITTED a posting could pass a plain-SELECT gate while a concurrent close
+ * commits, and still land in the now-closed period. FOR KEY SHARE would NOT suffice
+ * (it does not conflict with non-key UPDATEs); FOR SHARE is chosen over FOR UPDATE
+ * because share locks are mutually compatible — concurrent posters into the same
+ * period do not serialize against each other.
  */
 export async function assertPeriodOpen(
   tx: Tx,
@@ -204,8 +214,9 @@ export async function assertPeriodOpen(
         eq(schema.fiscalPeriods.tenantId, tenantId),
         sql`${postingDate}::date BETWEEN ${schema.fiscalPeriods.startsOn} AND ${schema.fiscalPeriods.endsOn}`,
       ),
-    );
+    )
+    .for("share");
   const row = rows[0];
-  if (!row) throw new PeriodNotOpenError(postingDate);
-  if (row.status === "closed") throw new PeriodClosedError(postingDate);
+  if (!row) throw new FiscalPeriodNotOpenError(postingDate);
+  if (row.status === "closed") throw new FiscalPeriodClosedError(postingDate);
 }

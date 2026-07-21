@@ -3,9 +3,9 @@ import { schema, withTenantTx } from "@erp/db";
 import { and, eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  PeriodClosedError,
-  PeriodNotClosedError,
-  PeriodNotOpenError,
+  FiscalPeriodClosedError,
+  FiscalPeriodNotClosedError,
+  FiscalPeriodNotOpenError,
   VersionConflictError,
 } from "./errors.js";
 import { assertPeriodOpen, closePeriod, createPeriod, reopenPeriod } from "./fiscal.js";
@@ -126,7 +126,7 @@ describe("fiscal calendar + period-close posting gate", () => {
     ).resolves.toBeUndefined();
   });
 
-  it("closed period blocks: audit + event on close, then PeriodClosedError", async () => {
+  it("closed period blocks: audit + event on close, then FiscalPeriodClosedError", async () => {
     const tenantId = await newTenant(t);
     const ids = await createYearPeriods(t, tenantId, 2026);
     const julyId = ids.get(7);
@@ -152,15 +152,15 @@ describe("fiscal calendar + period-close posting gate", () => {
 
     await expect(
       withTenantTx(t.handle.db, { tenantId }, (tx) => assertPeriodOpen(tx, tenantId, "2026-07-15")),
-    ).rejects.toBeInstanceOf(PeriodClosedError);
+    ).rejects.toBeInstanceOf(FiscalPeriodClosedError);
   });
 
-  it("missing period fails closed: PeriodNotOpenError", async () => {
+  it("missing period fails closed: FiscalPeriodNotOpenError", async () => {
     await expect(
       withTenantTx(t.handle.db, { tenantId: t.tenantId }, (tx) =>
         assertPeriodOpen(tx, t.tenantId, "2031-01-01"),
       ),
-    ).rejects.toBeInstanceOf(PeriodNotOpenError);
+    ).rejects.toBeInstanceOf(FiscalPeriodNotOpenError);
   });
 
   it("boundary dates: startsOn and endsOn are IN the period (inclusive)", async () => {
@@ -239,15 +239,15 @@ describe("fiscal calendar + period-close posting gate", () => {
     expect(await auditRows(t, julyId, "fiscal.reopen-period")).toHaveLength(1);
     expect(await outboxRows(t, "FiscalPeriodReopened", julyId)).toHaveLength(1);
 
-    // reopening an already-open period is a typed error, not PeriodNotOpenError
+    // reopening an already-open period is a typed error, not FiscalPeriodNotOpenError
     await expect(
       withTenantTx(t.handle.db, { tenantId }, (tx) =>
         reopenPeriod(tx, { tenantId, periodId: julyId, expectedVersion: 3, actor: null }),
       ),
-    ).rejects.toBeInstanceOf(PeriodNotClosedError);
+    ).rejects.toBeInstanceOf(FiscalPeriodNotClosedError);
   });
 
-  it("the gate is WIRED: adjustOnHand passes on open, throws PeriodClosedError after close", async () => {
+  it("the gate is WIRED: adjustOnHand passes on open, throws FiscalPeriodClosedError after close", async () => {
     const tenantId = await newTenant(t);
     const ids = await createYearPeriods(t, tenantId, 2026);
     const julyId = ids.get(7);
@@ -285,7 +285,7 @@ describe("fiscal calendar + period-close posting gate", () => {
           actor: null,
         }),
       ),
-    ).rejects.toBeInstanceOf(PeriodClosedError);
+    ).rejects.toBeInstanceOf(FiscalPeriodClosedError);
 
     // blocked posting wrote NOTHING
     [item] = await t.handle.db
@@ -294,6 +294,47 @@ describe("fiscal calendar + period-close posting gate", () => {
       .where(eq(schema.stockItems.id, itemId));
     expect(Number(item?.onHand)).toBe(105);
     expect(await auditRows(t, itemId, "stock.adjust")).toHaveLength(1);
+  });
+
+  it("gate lock: an in-flight posting's FOR SHARE blocks closePeriod until the posting commits", async () => {
+    const tenantId = await newTenant(t);
+    const ids = await createYearPeriods(t, tenantId, 2026);
+    const julyId = ids.get(7);
+    if (!julyId) throw new Error("period 7 missing");
+
+    let gateHeld!: () => void;
+    const gateHeldP = new Promise<void>((res) => {
+      gateHeld = res;
+    });
+    let releaseGate!: () => void;
+    const gateDone = new Promise<void>((res) => {
+      releaseGate = res;
+    });
+
+    // Tx A: take the gate's FOR SHARE lock, then hold the transaction open.
+    const posting = withTenantTx(t.handle.db, { tenantId }, async (tx) => {
+      await assertPeriodOpen(tx, tenantId, "2026-07-15");
+      gateHeld();
+      await gateDone;
+    });
+    await gateHeldP;
+
+    // Tx B: closePeriod's FOR NO KEY UPDATE conflicts with FOR SHARE → must block.
+    let closeSettled = false;
+    const close = withTenantTx(t.handle.db, { tenantId }, (tx) =>
+      closePeriod(tx, { tenantId, periodId: julyId, expectedVersion: 1, actor: null }),
+    ).finally(() => {
+      closeSettled = true;
+    });
+
+    await new Promise((r) => setTimeout(r, 300));
+    expect(closeSettled).toBe(false); // still blocked while the posting tx is open
+
+    releaseGate();
+    await posting; // posting commits → lock released
+    await close; // close proceeds and succeeds
+    expect(closeSettled).toBe(true);
+    expect((await periodRow(t, julyId)).status).toBe("closed");
   });
 
   it("RLS: tenant B and context-less sessions see ZERO fiscal periods", async () => {
