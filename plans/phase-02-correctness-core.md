@@ -9,7 +9,7 @@
 **Tech Stack:** everything Phase 1 pinned, plus **pg-boss 12** (jobs/cron) and **fast-check 4** (property tests). PostgreSQL RLS with `FORCE ROW LEVEL SECURITY`; Drizzle `pgSchema`/`pgPolicy`/`pgRole` (Context7-verified for 0.45.2); Node 24; all packages **ESM**.
 
 - **Implements:** spec §6 (correctness core), §7 (tenancy/RLS + audit tranche), §8 (envelope/versioning/idempotency), §9.1–9.2 (data/eventing), §10.2 (sub-sequencing) — [2026-07-16-erp-ai-native-system-design.md](../docs/superpowers/specs/2026-07-16-erp-ai-native-system-design.md)
-- **Status:** ✅ **approved** (user sign-off 2026-07-20 after a 3-iteration review loop) — **not yet executed**
+- **Status:** ✅ complete (pending PR — user opens it; CI runs on the `pull_request` trigger)
 - **Created:** 2026-07-18 · **Last updated:** 2026-07-20
 - **Depends on:** Phase 1 (merged to `main` @ `ddd37f8`, PR #1)
 
@@ -108,15 +108,15 @@ apps/worker/                            # @erp/worker — NestJS app context (no
 
 ## Task 0: Branch + plan status
 
-- [ ] **Step 1: Create the branch**
+- [x] **Step 1: Create the branch**
 
 ```bash
 git checkout main && git pull && git checkout -b phase-02-correctness-core
 ```
 
-- [ ] **Step 2: Mark this plan in-progress** — edit this file's `**Status:**` line to `🚧 in progress`.
+- [x] **Step 2: Mark this plan in-progress** — edit this file's `**Status:**` line to `🚧 in progress`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add plans/phase-02-correctness-core.md
@@ -131,7 +131,7 @@ git commit -m "docs(plans): phase-02 correctness core - mark in progress"
 
 The api currently runs CommonJS (D-018); all `@erp/*` packages are ESM (D-014). Phase-1 api code already uses `.js` relative specifiers, so this is a config flip. **This task is a hard gate:** NestJS's own docs flag ESM support as partial (an `esmCompatible` tooling flag exists; the framework is CJS-first), so verify honestly and fall back cleanly if the framework fights back.
 
-- [ ] **Step 1: Run the full api suite green as the baseline**
+- [x] **Step 1: Run the full api suite green as the baseline**
 
 Run as discrete steps (do NOT chain with `&` — backgrounding the whole chain makes the curl race the build):
 1. `pnpm --filter @erp/api test` → PASS
@@ -139,7 +139,7 @@ Run as discrete steps (do NOT chain with `&` — backgrounding the whole chain m
 3. In a second terminal: `DATABASE_URL=postgresql://erp:erp@localhost:5432/erp node apps/api/dist/main.js` (PowerShell: set `$env:DATABASE_URL` first). The env var matters: `loadConfig` fails fast without `DATABASE_URL` — do not misread that config error as an ESM failure.
 4. `curl -s localhost:3000/health` → `{"status":"ok"}`; stop the node process.
 
-- [ ] **Step 2: Flip to ESM**
+- [x] **Step 2: Flip to ESM**
 
 `apps/api/package.json`: add `"type": "module"` (top level, next to `"private": true`).
 `apps/api/.swcrc`: add a `module` block so SWC emits ESM for **both** `nest build` and Vitest (unplugin-swc reads this same file — that was D-018's point):
@@ -156,7 +156,7 @@ Run as discrete steps (do NOT chain with `&` — backgrounding the whole chain m
 }
 ```
 
-- [ ] **Step 3: Run the gate — tests, build, boot**
+- [x] **Step 3: Run the gate — tests, build, boot** *(gate PASSED first try — ESM shipped, fallback unused → D-020)*
 
 Run: `pnpm --filter @erp/api typecheck && pnpm --filter @erp/api test && pnpm --filter @erp/api build`
 Then boot: `DATABASE_URL=postgresql://erp:erp@localhost:5432/erp node apps/api/dist/main.js` and `curl -s localhost:3000/health` → `{"status":"ok"}`; stop it.
@@ -168,14 +168,14 @@ Expected: ALL green. Diagnose config-level failures (bad `.swcrc`, missing `.js`
 > 3. Re-run this step's gate commands; Task 2 then proceeds with the api staying CJS.
 > Record whichever variant shipped as **D-020**.
 
-- [ ] **Step 4: Commit the flip**
+- [x] **Step 4: Commit the flip**
 
 ```bash
 git add apps/api/package.json apps/api/.swcrc
 git commit -m "refactor(api): run apps/api as ESM (type module, swc es6 emit)"
 ```
 
-- [ ] **Step 5: CI actions bump** (clears the Node-20-deprecation warnings on the runners)
+- [x] **Step 5: CI actions bump** *(pnpm/action-setup bumped to v6 — tag verified to exist)* (clears the Node-20-deprecation warnings on the runners)
 
 In `.github/workflows/ci.yml`, bump the action versions AND move `pnpm build` to run right after install — from Phase 2 on, cross-package imports resolve via each package's `dist`, so typecheck/tests need the workspace built first:
 
@@ -194,7 +194,7 @@ In `.github/workflows/ci.yml`, bump the action versions AND move `pnpm build` to
 ```
 (The trailing `pnpm build` step is removed — it moved up.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add .github/workflows/ci.yml
@@ -207,7 +207,7 @@ git commit -m "ci: bump actions to v5; build workspace before typecheck and test
 
 **Files:** Create `apps/api/src/db/db.module.ts`, `apps/api/src/health/ready.controller.ts`, `apps/api/src/health/ready.int.test.ts`, `apps/api/vitest.int.config.ts`, `packages/db/src/ping.ts`. Modify `apps/api/package.json` (deps + `test:int`), `apps/api/src/health/health.module.ts`, `packages/db/src/index.ts`.
 
-- [ ] **Step 1: Add `ping` to `@erp/db`** (keeps drizzle's `sql` out of the api — boundary-clean)
+- [x] **Step 1: Add `ping` to `@erp/db`** (keeps drizzle's `sql` out of the api — boundary-clean)
 
 `packages/db/src/ping.ts`:
 ```ts
@@ -221,7 +221,7 @@ export async function ping(db: Db): Promise<void> {
 ```
 Add `export * from "./ping.js";` to `packages/db/src/index.ts`.
 
-- [ ] **Step 2: Wire deps + int-test lane in the api**
+- [x] **Step 2: Wire deps + int-test lane in the api**
 
 `apps/api/package.json`: add to `dependencies`: `"@erp/db": "workspace:*"`; to `devDependencies`: `"@testcontainers/postgresql": "catalog:"`; to `scripts`: `"test:int": "vitest run --config vitest.int.config.ts"`.
 `apps/api/vitest.int.config.ts`:
@@ -242,7 +242,7 @@ export default defineConfig({
 Also exclude int tests from the unit lane: in `apps/api/vitest.config.ts` set `include: ["src/**/*.test.ts"], exclude: ["src/**/*.int.test.ts", "node_modules/**"]` (keep its existing `setupFiles`).
 Run: `pnpm install` → lockfile updates cleanly. Then `pnpm -r build` (the api resolves `@erp/db` — including Step 1's new `ping` — via its `dist`).
 
-- [ ] **Step 3: Write the failing int test**
+- [x] **Step 3: Write the failing int test** *(tamper via `handle.pool.query` — the plan's `import("drizzle-orm")` can't resolve from the api by design)*
 
 `apps/api/src/health/ready.int.test.ts`:
 ```ts
@@ -305,9 +305,9 @@ describe("GET /ready (integration)", () => {
 });
 ```
 
-- [ ] **Step 4: Run it, see it fail** — Run: `pnpm --filter @erp/api test:int` → FAIL (no `/ready`, no DbModule).
+- [x] **Step 4: Run it, see it fail** — Run: `pnpm --filter @erp/api test:int` → FAIL (no `/ready`, no DbModule).
 
-- [ ] **Step 5: Implement DbModule + ReadyController**
+- [x] **Step 5: Implement DbModule + ReadyController** *(+ biome.json `unsafeParameterDecoratorsEnabled` — first parameter decorators in repo)*
 
 `apps/api/src/db/db.module.ts`:
 ```ts
@@ -355,15 +355,15 @@ export class ReadyController {
 ```
 Wire up: add `DbModule` to `AppModule` imports; add `ReadyController` to `HealthModule` controllers.
 
-- [ ] **Step 6: Run to green** — Run: `pnpm --filter @erp/api test:int` → PASS (3). Also `pnpm --filter @erp/api test` (unit lane still green) and `pnpm --filter @erp/api build`.
+- [x] **Step 6: Run to green** — Run: `pnpm --filter @erp/api test:int` → PASS (3). Also `pnpm --filter @erp/api test` (unit lane still green) and `pnpm --filter @erp/api build`.
 
-- [ ] **Step 7: Verify dependency-cruiser actually SEES the new cross-package edge** (Phase-1 Task 9 flagged this: if workspace names don't resolve, the deep-import rules are silently under-enforced)
+- [x] **Step 7: Verify dependency-cruiser actually SEES the new cross-package edge** *(edges resolve to `packages/db/dist`; deliberate deep import failed `pnpm boundaries` as required, then clean)* (Phase-1 Task 9 flagged this: if workspace names don't resolve, the deep-import rules are silently under-enforced)
 
 Run: `pnpm boundaries` → exit 0. Then prove resolution for real — a green run alone proves nothing, because dependency-cruiser lists unresolved specifiers too:
 1. `pnpm exec depcruise --config .dependency-cruiser.cjs --output-type json apps/api/src > dep.json` and inspect the `@erp/db` edge: it must show `"couldNotResolve": false` (equivalently, a `resolved` path into `packages/db/`). If it shows `couldNotResolve: true`, add to `.dependency-cruiser.cjs` `options`: `enhancedResolveOptions: { exportsFields: ["exports"], conditionNames: ["import", "types", "default"] }` and re-check. Delete `dep.json` after.
 2. **Unconditionally run the red test** (this is the only real proof the deep-import rules bite): temporarily add `import "@erp/db/src/client.js";` to `apps/api/src/main.ts`, run `pnpm boundaries` → MUST exit non-zero (`no-app-deep-import`). Remove the import, re-run → exit 0. If the violation does NOT fail the run, the rules are silently under-enforced — fix resolution before proceeding.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add packages/db/src/ping.ts packages/db/src/index.ts apps/api .dependency-cruiser.cjs
@@ -376,7 +376,7 @@ git commit -m "feat(api): GET /ready with schema-version + connectivity gate (50
 
 **Files:** Create `packages/db/src/schema/rls.ts`, `packages/db/src/schema/tenancy.ts`, `packages/db/src/tenant-tx.ts`, `packages/db/src/rls.int.test.ts`, generated migration + custom migration. Modify `packages/db/drizzle.config.ts`, `packages/db/src/schema/index.ts`, `packages/db/src/index.ts`, `packages/db/src/migrate.ts` (version → 2).
 
-- [ ] **Step 1: Role + policy helper**
+- [x] **Step 1: Role + policy helper**
 
 `packages/db/src/schema/rls.ts`:
 ```ts
@@ -400,7 +400,7 @@ export function tenantIsolation(policyName: string) {
 }
 ```
 
-- [ ] **Step 2: Tenants table**
+- [x] **Step 2: Tenants table** *(fallback exercised: drizzle-kit can't resolve cross-file schema imports — `tenantCtx` inlined in tenancy.ts; NO schema file may import another schema file from here on)*
 
 `packages/db/src/schema/tenancy.ts`:
 ```ts
@@ -432,7 +432,7 @@ export const tenants = platformSchema.table(
 `packages/db/src/schema/index.ts`: add `export * from "./rls.js"; export * from "./tenancy.js";`
 `packages/db/drizzle.config.ts`: add the new files to `schema` (explicit list per D-017): `schema: ["./src/schema/platform.ts", "./src/schema/rls.ts", "./src/schema/tenancy.ts"]`, and add `entities: { roles: true }` so drizzle-kit generates `CREATE ROLE app_rw`.
 
-- [ ] **Step 3: Generate + review, then hand-write the custom migration**
+- [x] **Step 3: Generate + review, then hand-write the custom migration** *(0001 reviewed: schema+role+table+ENABLE+policy, nothing destructive; CREATE ROLE hand-guarded idempotent after review; 0002 verbatim)*
 
 Run: `pnpm --filter @erp/db db:generate`
 Expected: a new migration creating schema `platform`, table `platform.tenants`, `CREATE ROLE "app_rw"`, the policy, and `ENABLE ROW LEVEL SECURITY`. **Review the SQL** — nothing destructive, role included (if `enableRLS` isn't emitted automatically alongside the policy, the custom migration below covers it deterministically).
@@ -458,7 +458,7 @@ GRANT SELECT ON "platform_meta" TO "app_rw";
 
 Bump `packages/db/src/migrate.ts`: `EXPECTED_SCHEMA_VERSION = 2`.
 
-- [ ] **Step 4: Write the failing fail-closed tests** (test-first: `withTenantTx` doesn't exist yet — Steps 1–3 built the fixture, this drives the wrapper)
+- [x] **Step 4: Write the failing fail-closed tests** (test-first: `withTenantTx` doesn't exist yet — Steps 1–3 built the fixture, this drives the wrapper)
 
 `packages/db/src/rls.int.test.ts`:
 ```ts
@@ -552,9 +552,9 @@ describe("RLS is always-on and fail-closed", () => {
 });
 ```
 
-- [ ] **Step 5: Run it, see it fail** — Run: `pnpm --filter @erp/db test:int` → FAIL (`./tenant-tx.js` does not exist yet; the Step 1–3 schema/migrations are the fixture, the wrapper is what these tests drive).
+- [x] **Step 5: Run it, see it fail** — Run: `pnpm --filter @erp/db test:int` → FAIL (`./tenant-tx.js` does not exist yet; the Step 1–3 schema/migrations are the fixture, the wrapper is what these tests drive).
 
-- [ ] **Step 6: Implement `withTenantTx`**
+- [x] **Step 6: Implement `withTenantTx`**
 
 `packages/db/src/tenant-tx.ts`:
 ```ts
@@ -587,9 +587,9 @@ export async function withTenantTx<T>(db: Db, ctx: TenantContext, fn: (tx: Tx) =
 ```
 `packages/db/src/index.ts`: add `export * from "./tenant-tx.js";`
 
-- [ ] **Step 7: Run to green** — Run: `pnpm --filter @erp/db test:int` → PASS (existing 2 migrate tests + 6 RLS tests). Then `pnpm --filter @erp/db typecheck && pnpm --filter @erp/db build`.
+- [x] **Step 7: Run to green** — Run: `pnpm --filter @erp/db test:int` → PASS (existing 2 migrate tests + 6 RLS tests). *(+ review fix `39e6803`: catalog assertion → fail-closed blocklist incl. partitioned tables)* Then `pnpm --filter @erp/db typecheck && pnpm --filter @erp/db build`.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add packages/db
@@ -602,7 +602,7 @@ git commit -m "feat(db): tenancy + fail-closed RLS (app_rw, FORCE RLS, withTenan
 
 **Files:** Create `packages/platform/{package.json,tsconfig.json,vitest.config.ts,vitest.int.config.ts}`, `packages/platform/src/{index.ts,errors.ts,stable-stringify.ts,stable-stringify.test.ts,audit.ts,audit.int.test.ts,testkit.ts}`, `packages/db/src/schema/audit.ts`, generated + custom migrations. Modify `pnpm-workspace.yaml` (catalog: fast-check), `packages/db/drizzle.config.ts`, `packages/db/src/schema/index.ts`, `packages/db/src/migrate.ts` (version → 3).
 
-- [ ] **Step 1: Catalog + package scaffolding**
+- [x] **Step 1: Catalog + package scaffolding**
 
 `pnpm-workspace.yaml` catalog additions:
 ```yaml
@@ -644,7 +644,7 @@ git commit -m "feat(db): tenancy + fail-closed RLS (app_rw, FORCE RLS, withTenan
 `tsconfig.json`/`vitest.config.ts`: mirror `@erp/db` (unit config includes `src/**/*.test.ts`, excludes `*.int.test.ts`; int config includes `src/**/*.int.test.ts` with 120s timeouts).
 Run: `pnpm install` → clean.
 
-- [ ] **Step 2: Audit schema**
+- [x] **Step 2: Audit schema** *(inline schema pattern per Task-3 constraint; ON CONFLICT `AS h` alias form works on PG18)*
 
 `packages/db/src/schema/audit.ts`:
 ```ts
@@ -714,7 +714,7 @@ CREATE TRIGGER audit_log_no_truncate
 ```
 Bump `EXPECTED_SCHEMA_VERSION = 3`.
 
-- [ ] **Step 3: Failing unit test for `stableStringify`**
+- [x] **Step 3: Failing unit test for `stableStringify`**
 
 `packages/platform/src/stable-stringify.test.ts`:
 ```ts
@@ -750,7 +750,7 @@ export function stableStringify(value: unknown): string {
 ```
 Run → PASS.
 
-- [ ] **Step 4: Failing int tests for the audit chain**
+- [x] **Step 4: Failing int tests for the audit chain**
 
 Shared helper first — `packages/platform/src/testkit.ts`:
 ```ts
@@ -880,7 +880,7 @@ describe("hash-chained audit", () => {
 Also add the standard **RLS probes** (cross-tenant read of `audit_log` → 0 rows; context-less → 0 rows).
 Run: `pnpm -r build && pnpm --filter @erp/platform test:int` → FAIL.
 
-- [ ] **Step 5: Implement `appendAudit` / `verifyAuditChain`**
+- [x] **Step 5: Implement `appendAudit` / `verifyAuditChain`** *(+ review fix `09131d2`: repeatable-read snapshot verify, uuid normalization, stableStringify toJSON/undefined edge cases, ABBA-deadlock rule documented)*
 
 `packages/platform/src/audit.ts`:
 ```ts
@@ -982,9 +982,9 @@ export abstract class DomainError extends Error {
 ```
 `packages/platform/src/index.ts`: export errors, stable-stringify, audit.
 
-- [ ] **Step 6: Run to green** — `pnpm -r build && pnpm --filter @erp/platform test && pnpm --filter @erp/platform test:int` → PASS. `pnpm --filter @erp/db test:int` still green. `pnpm boundaries` exit 0.
+- [x] **Step 6: Run to green** — `pnpm -r build && pnpm --filter @erp/platform test && pnpm --filter @erp/platform test:int` → PASS. `pnpm --filter @erp/db test:int` still green. `pnpm boundaries` exit 0.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add pnpm-workspace.yaml pnpm-lock.yaml packages/platform packages/db
@@ -997,7 +997,7 @@ git commit -m "feat(platform): hash-chained immutable audit log with per-aggrega
 
 **Files:** Create `packages/db/src/schema/outbox.ts`, `packages/platform/src/{outbox.ts,outbox-relay.ts,outbox-relay.int.test.ts}`, `apps/worker/*` (full scaffold per the file structure), migrations. Modify `packages/db/drizzle.config.ts` + `schema/index.ts`, `migrate.ts` (version → 4), `packages/platform/src/index.ts`, `.env.example` (`RELAY_INTERVAL_MS=1000`).
 
-- [ ] **Step 1: Outbox + archive schema**
+- [x] **Step 1: Outbox + archive schema** *(partial-index `.where` form worked — no fallback needed)*
 
 `packages/db/src/schema/outbox.ts`:
 ```ts
@@ -1055,7 +1055,7 @@ REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON "platform"."event_archive" FROM "app_
 ```
 Bump `EXPECTED_SCHEMA_VERSION = 4`.
 
-- [ ] **Step 2: `appendOutbox`** *(NOTE — Steps 2–3 are the reference implementations for this task's code; in execution order, write Step 4's failing tests FIRST, see them fail, then implement Steps 2–3 to green, per the TDD convention.)*
+- [x] **Step 2: `appendOutbox`** *(NOTE — Steps 2–3 are the reference implementations for this task's code; in execution order, write Step 4's failing tests FIRST, see them fail, then implement Steps 2–3 to green, per the TDD convention.)*
 
 `packages/platform/src/outbox.ts`:
 ```ts
@@ -1089,7 +1089,7 @@ export const EVENT_SCHEMAS: Record<string, Record<number, z.ZodType>> = {};
 ```
 Add `InvalidEventPayloadError` to `errors.ts`; export from barrels.
 
-- [ ] **Step 3: The relay**
+- [x] **Step 3: The relay** *(pg-boss 12 exports `PgBoss` named, not default; `ANY(ARRAY[...]::uuid[])` via sql.join; occurred_at string-normalized)*
 
 `packages/platform/src/outbox-relay.ts`:
 ```ts
@@ -1165,7 +1165,7 @@ export async function relayOutboxBatch(
 }
 ```
 
-- [ ] **Step 4: Failing relay int test**
+- [x] **Step 4: Failing relay int test**
 
 `packages/platform/src/outbox-relay.int.test.ts` — cases (write them, see them fail, then wire green):
 1. **Same-tx write + relay round trip:** inside one `withTenantTx`: `appendAudit` + `appendOutbox(createEvent(...))` (a `TestThingHappened` v1 event; kernel `createEvent` with the test tenant). Then start a real `PgBoss` on `container.getConnectionUri()` (`await boss.start()`; `await boss.createQueue("test-queue")`), registry `{ TestThingHappened: ["test-queue"] }`, run `relayOutboxBatch` → returns 1; assert: `event_archive` has the row; `outbox.relayed_at` set; `boss.fetch("test-queue")` returns the job whose data is the **camelCase DomainEvent envelope** (`eventId`/`tenantId`/`eventVersion`/`occurredAt`/`correlationId`/`payload` — assert the keys, not the raw snake_case row).
@@ -1176,7 +1176,7 @@ export async function relayOutboxBatch(
 Teardown: `await boss.stop()` before the container stops.
 Run: `pnpm -r build && pnpm --filter @erp/platform test:int` → FAIL → implement Steps 2–3 → PASS.
 
-- [ ] **Step 5: `apps/worker` scaffold (born ESM)**
+- [x] **Step 5: `apps/worker` scaffold (born ESM)**
 
 `apps/worker/package.json` — mirror `apps/api` (name `@erp/worker`, `"type": "module"`, same scripts + `test:int`), dependencies: `@nestjs/common`, `@nestjs/core`, `reflect-metadata`, `rxjs`, `zod`, `pg-boss: "catalog:"`, `@erp/db`, `@erp/platform` (workspace:*); devDependencies mirror the api (`@nestjs/cli`, `@nestjs/testing`, `@swc/cli`, `@swc/core`, `unplugin-swc`, `typescript`, `vitest`, `@testcontainers/postgresql`) **plus `"@erp/kernel": "workspace:*"`** — the int test builds a `TestThingHappened` event with kernel `createEvent`, and the platform barrel does not re-export it. Copy the api's `.swcrc` (with the `module: es6` block), `nest-cli.json`, `tsconfig.json`, vitest configs. **Finish the scaffold with `pnpm install`** (new workspace package + new deps → lockfile updates; it is staged in Step 8).
 `apps/worker/src/config/env.ts` (+ unit test, mirroring the api's env test):
@@ -1310,14 +1310,14 @@ async function bootstrap() {
 void bootstrap();
 ```
 
-- [ ] **Step 6: Failing worker int test → green**
+- [x] **Step 6: Failing worker int test → green**
 
 `apps/worker/src/worker.int.test.ts`: (1) boot `WorkerModule` (via `Test.createTestingModule` + `init()`) against a migrated Testcontainers DB → bootstrap succeeds, then `close()` cleanly; (2) tamper `platform_meta.schema_version` → boot **rejects** (assertSchemaVersion throws) — then **restore it with `runMigrations`** before the next case (the api test shows the pattern); (3) end-to-end drain: with the app context up, `withTenantTx` + `appendOutbox` a `TestThingHappened` event → poll until `relayed_at` is set and the row is in `event_archive` (≤ 5s). Queue fan-out with a populated registry is already covered by the platform relay test — `PROD_REGISTRY` is empty here and that is fine; do NOT add registry-override machinery for this test.
 Run: `pnpm -r build && pnpm --filter @erp/worker test && pnpm --filter @erp/worker test:int` → iterate to PASS. `pnpm boundaries` exit 0.
 
-- [ ] **Step 7: `.env.example`** — add `RELAY_INTERVAL_MS=1000`.
+- [x] **Step 7: `.env.example`** — add `RELAY_INTERVAL_MS=1000`.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit** *(+ review fixup `008da67`: poison-row TODO(Phase 3), FORCE-RLS superuser-connection comment, archive-visibility caveat, worker boot failure handler)*
 
 ```bash
 git add packages/db packages/platform packages/contracts apps/worker .env.example pnpm-lock.yaml
@@ -1330,7 +1330,7 @@ git commit -m "feat(platform,worker): transactional outbox, event archive, pg-bo
 
 **Files:** Create `packages/db/src/schema/masterdata.ts`, `packages/db/src/schema/stock.ts`, `packages/platform/src/stock.ts`, `packages/platform/src/stock.int.test.ts`, `packages/contracts/src/events/stock.ts`, migrations. Modify registries/barrels/config, `migrate.ts` (version → 5).
 
-- [ ] **Step 1: Schema**
+- [x] **Step 1: Schema** *(FK via `.references()` failed at drizzle-kit load — FKs shipped as plain SQL in the custom migration, D-017 pattern)*
 
 `packages/db/src/schema/masterdata.ts`:
 ```ts
@@ -1406,7 +1406,7 @@ export const stockReservations = whSchema.table(
 Generate + review; custom migration `--custom --name=md-wh-rls-force`: ENABLE/FORCE all three tables + `GRANT USAGE ON SCHEMA md, wh TO app_rw` + per-schema GRANT/DEFAULT PRIVILEGES (as in Task 3). Bump `EXPECTED_SCHEMA_VERSION = 5`.
 > The DB CHECKs are the belt-and-braces backstop; the atomic UPDATE guard below is the primary invariant. The negative-stock policy is per stock item (`allow_negative`), satisfying "configurable negative-stock policy" without a config table.
 
-- [ ] **Step 2: Event contracts**
+- [x] **Step 2: Event contracts**
 
 `packages/contracts/src/events/stock.ts`:
 ```ts
@@ -1435,7 +1435,7 @@ export const EVENT_SCHEMAS: Record<string, Record<number, z.ZodType>> = {
 ```
 Export from the contracts barrel; add a unit test that each schema round-trips a valid payload and rejects a float-typed qty (`qty: 1.5` as number → fail).
 
-- [ ] **Step 3: Failing stock int tests** (write ALL of these first; run `pnpm -r build && pnpm --filter @erp/platform test:int` → FAIL)
+- [x] **Step 3: Failing stock int tests** (write ALL of these first; run `pnpm -r build && pnpm --filter @erp/platform test:int` → FAIL)
 
 `packages/platform/src/stock.int.test.ts` — cases:
 1. **reserve happy path:** seed material + stock item (`on_hand: "100"`) as superuser; `withTenantTx` → `reserve(tx, { tenantId, stockItemId, qty: "30", kind: "hard", actor: null })` → counter `reserved = 30`; one active ledger row; one audit row (`action: "stock.reserve"`); one outbox `StockReserved` row — **all present in DB after the single tx**.
@@ -1479,7 +1479,7 @@ it("property: N concurrent reserves — no oversell, ledger sum == reserved coun
 7. **RLS probes:** tenant B sees none of tenant A's rows on `materials`, `stock_items`, AND `stock_reservations`; context-less → 0 rows on all three.
 8. **`appendOutbox` rejects malformed payloads** (first task with a populated registry, so the reject path is testable here): build a `StockReserved` v1 event via `createEvent` whose payload lacks `qty` → `appendOutbox` throws `InvalidEventPayloadError` and writes NO outbox row.
 
-- [ ] **Step 4: Implement `packages/platform/src/stock.ts`**
+- [x] **Step 4: Implement `packages/platform/src/stock.ts`**
 
 ```ts
 import { and, eq, sql } from "drizzle-orm";
@@ -1535,9 +1535,9 @@ export async function reserve(tx: Tx, input: ReserveInput): Promise<{ reservatio
 ```
 `release` / `consume` follow the same shape (guarded status transition `active → released|consumed` — 0 rows → `ReservationNotActiveError`; counter update `reserved - qty` (+ `on_hand - qty` for consume); audit + event). `adjustOnHand(tx, { tenantId, stockItemId, delta, reason, postingDate, actor })`: guarded `on_hand + delta` UPDATE with the same no-oversell predicate (`allow_negative OR on_hand + delta - reserved >= 0`… careful: predicate is `(allow_negative OR (on_hand + ${delta}::numeric) >= reserved)`), audit `stock.adjust`, event `StockAdjusted`. `postingDate: string` (`YYYY-MM-DD`) is part of `adjustOnHand`'s signature AND the event payload from birth (the registered schema requires it); the fiscal GATE on it arrives in Task 9. `getAvailable(tx, stockItemId)`: `SELECT on_hand - reserved`. Add the three error classes to `errors.ts`. Export all from the barrel.
 
-- [ ] **Step 5: Run to green** — `pnpm -r build && pnpm --filter @erp/platform test:int` → PASS (audit + outbox + stock suites). `pnpm --filter @erp/contracts test` → PASS.
+- [x] **Step 5: Run to green** — `pnpm -r build && pnpm --filter @erp/platform test:int` → PASS (audit + outbox + stock suites). `pnpm --filter @erp/contracts test` → PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/db packages/platform packages/contracts
@@ -1550,7 +1550,7 @@ git commit -m "feat(platform): stock reservation/ATP with concurrency property t
 
 **Files:** Modify `packages/platform/src/stock.ts` (+ its int test), `packages/platform/src/errors.ts`.
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
 
 Add to `stock.int.test.ts`:
 1. **stale version rejected:** read item (`version = v`); `adjustOnHand({ …, postingDate: "2026-07-15", expectedVersion: v })` succeeds and bumps to `v+1`; a second adjust with the SAME `expectedVersion: v` throws `VersionConflictError` carrying `{ expected: v, actual: v + 1 }`; state reflects exactly one adjustment. (All Task-7 adjust calls pass `postingDate: "2026-07-15"` — the field exists since Task 6; the fiscal GATE doesn't exist until Task 9, so no periods are needed here.)
@@ -1580,14 +1580,14 @@ it("property: exactly one of N same-version concurrent writers wins", async () =
 3. **retry loop converges:** N workers each loop `read version → adjust(expectedVersion)` on conflict (max 20 attempts) → all N eventually succeed exactly once; final `on_hand = initial + N`, `version = initial + N`.
 Run: `pnpm -r build && pnpm --filter @erp/platform test:int` → FAIL (no `expectedVersion` support).
 
-- [ ] **Step 2: Implement**
+- [x] **Step 2: Implement**
 
 In `adjustOnHand`, accept `expectedVersion?: number`; when present add `eq(schema.stockItems.version, expectedVersion)` to the WHERE. On 0 rows: re-select — missing → `StockItemNotFoundError`; guard-failed with a version mismatch → `VersionConflictError(expected, actual)` (message contains "version conflict"); otherwise `InsufficientStockError`. Add `VersionConflictError { readonly code = "VERSION_CONFLICT"; constructor(public expected: number, public actual: number) … }` to `errors.ts`.
 > This is the execute-time version-guard pattern AI proposals reuse in Phase 4 (spec §6): compare at write time inside the tx; stale → fail, never silent overwrite. The HTTP 409 mapping lands when real endpoints exist.
 
-- [ ] **Step 3: Run to green** — `pnpm -r build && pnpm --filter @erp/platform test:int` → PASS.
+- [x] **Step 3: Run to green** — `pnpm -r build && pnpm --filter @erp/platform test:int` → PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add packages/platform
@@ -1600,7 +1600,7 @@ git commit -m "feat(platform): optimistic version guard - exactly one winner und
 
 **Files:** Create `packages/db/src/schema/numbering.ts`, `packages/platform/src/numbering.ts`, `packages/platform/src/numbering.int.test.ts`, migrations. Modify barrels/config, `migrate.ts` (version → 6).
 
-- [ ] **Step 1: Schema**
+- [x] **Step 1: Schema**
 
 `packages/db/src/schema/numbering.ts`:
 ```ts
@@ -1646,7 +1646,7 @@ export const numberAllocations = mdSchema.table(
 ```
 Generate + review; custom migration ENABLE/FORCE both. Bump `EXPECTED_SCHEMA_VERSION = 6`.
 
-- [ ] **Step 2: Failing tests** (`numbering.int.test.ts`)
+- [x] **Step 2: Failing tests** (`numbering.int.test.ts`)
 
 1. **sequential allocation + formatting:** `createRange({ rangeKey: "INV", period: "2026", prefix: "INV-2026-", padTo: 6 })` (audited); three `allocateNumber` calls → values 1,2,3; formatted `INV-2026-000001` …
 2. **unknown range →** `NumberRangeNotFoundError`.
@@ -1683,7 +1683,7 @@ it("property: 100 concurrent allocations are dense and duplicate-free", async ()
 6. **RLS probes** on both tables.
 Run → FAIL.
 
-- [ ] **Step 3: Implement `packages/platform/src/numbering.ts`**
+- [x] **Step 3: Implement `packages/platform/src/numbering.ts`**
 
 ```ts
 import { and, eq, sql } from "drizzle-orm";
@@ -1751,9 +1751,9 @@ export async function detectGaps(tx: Tx, ref: { tenantId: string; rangeKey: stri
 ```
 > SAP-connected numbering (consume from SAP / provisional-id→adopt, spec §6/§9.3) is a Phase-5 concern; this local allocator is the `standalone` implementation behind the same call shape — do NOT abstract it prematurely (YAGNI), just keep the function signature payload-compatible.
 
-- [ ] **Step 4: Run to green** — `pnpm -r build && pnpm --filter @erp/platform test:int` → PASS.
+- [x] **Step 4: Run to green** — `pnpm -r build && pnpm --filter @erp/platform test:int` → PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/db packages/platform
@@ -1766,7 +1766,7 @@ git commit -m "feat(platform): gapless number ranges - dense and duplicate-free 
 
 **Files:** Create `packages/db/src/schema/fiscal.ts`, `packages/platform/src/fiscal.ts`, `packages/platform/src/fiscal.int.test.ts`, `packages/contracts/src/events/fiscal.ts`, migrations. Modify `packages/platform/src/stock.ts` (+ test) to wire the gate, barrels/config/registry, `migrate.ts` (version → 7).
 
-- [ ] **Step 1: Schema**
+- [x] **Step 1: Schema**
 
 `packages/db/src/schema/fiscal.ts`:
 ```ts
@@ -1816,9 +1816,9 @@ ALTER TABLE "fin"."fiscal_periods" ADD CONSTRAINT fiscal_periods_no_overlap
 ```
 Bump `EXPECTED_SCHEMA_VERSION = 7`.
 
-- [ ] **Step 2: Event contracts** — `packages/contracts/src/events/fiscal.ts`: `FiscalPeriodClosedV1 = z.object({ periodId: z.uuid(), year: z.int(), period: z.int() })`, `FiscalPeriodReopenedV1` same shape; register both in `events/registry.ts`; barrel + unit test.
+- [x] **Step 2: Event contracts** — `packages/contracts/src/events/fiscal.ts`: `FiscalPeriodClosedV1 = z.object({ periodId: z.uuid(), year: z.int(), period: z.int() })`, `FiscalPeriodReopenedV1` same shape; register both in `events/registry.ts`; barrel + unit test.
 
-- [ ] **Step 3: Failing tests** (`fiscal.int.test.ts`)
+- [x] **Step 3: Failing tests** (`fiscal.int.test.ts`)
 
 1. **create + gate happy path:** create 2026 periods 1–12 (helper building month boundaries); `assertPeriodOpen(tx, tenantId, "2026-07-15")` resolves.
 2. **closed period blocks:** `closePeriod` period 7 (audited + `FiscalPeriodClosed` outbox event asserted) → `assertPeriodOpen(…, "2026-07-15")` throws `PeriodClosedError`.
@@ -1830,7 +1830,7 @@ Bump `EXPECTED_SCHEMA_VERSION = 7`.
 8. **RLS probes.**
 Run → FAIL.
 
-- [ ] **Step 4: Implement `packages/platform/src/fiscal.ts`** (same shape as previous domains)
+- [x] **Step 4: Implement `packages/platform/src/fiscal.ts`** (same shape as previous domains) *(reopen-of-open → new `FiscalPeriodNotClosedError`; error classes Fiscal-qualified per review)*
 
 - `createPeriod(tx, { tenantId, year, period, startsOn, endsOn, actor })` → insert + audit (`fiscal.create-period`).
 - `closePeriod(tx, { tenantId, periodId, expectedVersion, actor })` → guarded UPDATE `status: 'open' → 'closed'` + `version + 1` + `closedAt/closedBy`, `WHERE id AND version = expected AND status = 'open'`; 0 rows → re-select → missing → `PeriodNotFoundError`, version mismatch → `VersionConflictError`, already closed → `PeriodClosedError`; then audit + `FiscalPeriodClosed` event. `reopenPeriod` mirrors it.
@@ -1838,9 +1838,9 @@ Run → FAIL.
 - Wire the gate: `adjustOnHand` (which has carried `postingDate` since Task 6) now calls `assertPeriodOpen` first; update the Task-6/7 int tests to create open periods covering their posting dates in `beforeAll`. Reservation does NOT take the gate (a reservation is not a posting).
 - New errors: `PeriodNotFoundError`, `PeriodNotOpenError`, `PeriodClosedError`.
 
-- [ ] **Step 5: Run to green** — `pnpm -r build && pnpm --filter @erp/platform test:int` (all suites) + `pnpm --filter @erp/contracts test` → PASS.
+- [x] **Step 5: Run to green** — `pnpm -r build && pnpm --filter @erp/platform test:int` (all suites) + `pnpm --filter @erp/contracts test` → PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/db packages/platform packages/contracts
@@ -1853,12 +1853,12 @@ git commit -m "feat(platform): fiscal calendar + period-close posting gate"
 
 **Files:** Create `packages/db/src/seed.ts`, `packages/db/src/seed.int.test.ts`. Modify `packages/db/src/index.ts`, this plan, `journal/PROGRESS.md`, `journal/DECISIONS.md`.
 
-- [ ] **Step 1: Deterministic seed (failing test first)**
+- [x] **Step 1: Deterministic seed (failing test first)** *(+ review additions: never-clobber regression test — live current_value/closed-period/on_hand survive a re-run; docblock + UUID block registry)*
 
 `seed.int.test.ts`: `seedBaseline(db)` on a migrated DB → creates the fixed DEV tenant (`00000000-0000-7000-8000-000000000001`), 3 materials (`KITE-12M`, `BAR-55`, `BOARD-136`), stock items (on-hand 100 each), ranges `SO`/`INV` (period `"2026"`, prefixes `SO-2026-`/`INV-2026-`, padTo 6), fiscal periods 2026/1–12 open. **Run it twice → identical state (idempotent upserts), no duplicate-key errors.** Implement `seed.ts` with `onConflictDoNothing()` inserts as the superuser/bootstrap path (deliberate RLS bypass, same as tenant bootstrap); fixed UUIDs so tests/demos are stable. Export `seedBaseline` from the db barrel.
 Run: `pnpm --filter @erp/db test:int` → PASS.
 
-- [ ] **Step 2: Full local verification sweep — the exact CI matrix, plus boundary + worker lanes**
+- [x] **Step 2: Full local verification sweep — the exact CI matrix, plus boundary + worker lanes** *(all green 2026-07-21; compose path documented: /ready 503 on unmigrated → runMigrations+seedBaseline via script → /ready 200)*
 
 Run (each must be green; paste outputs into the session log):
 ```bash
@@ -1872,7 +1872,7 @@ pnpm -r test:int   # integration: db (migrate+rls+seed), platform (audit/outbox/
 ```
 Also boot the dev stack once against compose (`docker compose up -d`): run migrations against it (small script or `tsx`-invoked `runMigrations` — or simply trust the Testcontainers evidence and verify `/ready` returns 503 *before* migrations and 200 *after*; document which was done).
 
-- [ ] **Step 3: Update plan + journal**
+- [x] **Step 3: Update plan + journal**
 
 - This plan: tick every task checkbox, set Status → ✅ complete (pending PR).
 - `journal/PROGRESS.md`: append the phase-02 entry (what shipped · suite counts · next: Phase 3 platform kernel).
@@ -1885,7 +1885,7 @@ Also boot the dev stack once against compose (`docker compose up -d`): run migra
   - **D-024** outbox relay = interval loop in `apps/worker` (pg-boss cron floor is 1 min), at-least-once with `singletonKey` best-effort dedupe; consumer idempotency is the guarantee.
   - **D-025** gapless ranges: gaps detected (`detectGaps` + journal uniqueness) and explainable, not prevented; allocate-late convention documented.
 
-- [ ] **Step 4: Commit, push**
+- [x] **Step 4: Commit, push**
 
 ```bash
 git add packages/db plans/phase-02-correctness-core.md journal/
@@ -1899,20 +1899,20 @@ git push -u origin phase-02-correctness-core
 
 ## Verification (Definition of Done for Phase 2)
 
-- [ ] **ESM resolved:** api (and worker) build + boot + test green with the shipped module strategy; D-020 recorded
-- [ ] `GET /ready` → 200 on a migrated DB; **503** on schema mismatch AND on DB-down (fail-closed)
-- [ ] **RLS fail-closed proven on a real Postgres:** context-less → 0 rows; empty-string context → 0 rows (no cast error); cross-tenant → invisible; context-less write → rejected; no context leak across pooled transactions; ENABLE+FORCE catalog-asserted (`relrowsecurity AND relforcerowsecurity`) on every tenant table across `platform`/`md`/`wh`/`fin`
-- [ ] **Audit:** hash chain verifies; concurrent appends stay dense + valid; UPDATE/DELETE/TRUNCATE blocked (owner included); tamper detected by `verifyAuditChain`; log is payload-hash-only
-- [ ] **Outbox:** business write + audit + event commit in ONE tx; rollback leaves nothing; relay archives + fans out + marks; re-run is a no-op; at-least-once semantics documented + tested; worker boots with the schema gate and drains
-- [ ] **Reservation/ATP property-tested under real concurrency:** never negative (unless `allow_negative`), `reserved` == active-ledger sum == sum of successful reserves; oversell → typed error, nothing written
-- [ ] **Optimistic locking:** exactly-one-winner property + converging retry loop green
-- [ ] **Number ranges:** 100 concurrent allocations dense + duplicate-free; journal uniqueness enforced; `detectGaps` explains holes; allocate-late convention documented
-- [ ] **Fiscal:** closed/missing period blocks `adjustOnHand` (gate wired); overlap excluded; concurrent close has one winner
-- [ ] **Every migration** reviewed + checked in; `EXPECTED_SCHEMA_VERSION = 7`; boot gate green in api AND worker
-- [ ] **Boundaries:** `pnpm boundaries` exit 0 AND the cross-package edge is verifiably resolved (Task 2 Step 7)
-- [ ] **Both toggles untouched-green:** no SAP/AI surface added; standalone + local defaults unaffected
-- [ ] Full local sweep green (Task 10 Step 2 = the CI matrix); CI green on the PR
-- [ ] Plan checkboxes + `journal/PROGRESS.md` + `journal/DECISIONS.md` (D-019…D-025) updated; PR opened by the user
+- [x] **ESM resolved:** api (and worker) build + boot + test green with the shipped module strategy; D-020 recorded
+- [x] `GET /ready` → 200 on a migrated DB; **503** on schema mismatch AND on DB-down (fail-closed)
+- [x] **RLS fail-closed proven on a real Postgres:** context-less → 0 rows; empty-string context → 0 rows (no cast error); cross-tenant → invisible; context-less write → rejected; no context leak across pooled transactions; ENABLE+FORCE catalog-asserted (`relrowsecurity AND relforcerowsecurity`) on every tenant table across `platform`/`md`/`wh`/`fin`
+- [x] **Audit:** hash chain verifies; concurrent appends stay dense + valid; UPDATE/DELETE/TRUNCATE blocked (owner included); tamper detected by `verifyAuditChain`; log is payload-hash-only
+- [x] **Outbox:** business write + audit + event commit in ONE tx; rollback leaves nothing; relay archives + fans out + marks; re-run is a no-op; at-least-once semantics documented + tested; worker boots with the schema gate and drains
+- [x] **Reservation/ATP property-tested under real concurrency:** never negative (unless `allow_negative`), `reserved` == active-ledger sum == sum of successful reserves; oversell → typed error, nothing written
+- [x] **Optimistic locking:** exactly-one-winner property + converging retry loop green
+- [x] **Number ranges:** 100 concurrent allocations dense + duplicate-free; journal uniqueness enforced; `detectGaps` explains holes; allocate-late convention documented
+- [x] **Fiscal:** closed/missing period blocks `adjustOnHand` (gate wired); overlap excluded; concurrent close has one winner *(+ gate takes FOR SHARE — close/post race closed, lock-semantics test added)*
+- [x] **Every migration** reviewed + checked in; `EXPECTED_SCHEMA_VERSION = 7`; boot gate green in api AND worker
+- [x] **Boundaries:** `pnpm boundaries` exit 0 AND the cross-package edge is verifiably resolved (Task 2 Step 7)
+- [x] **Both toggles untouched-green:** no SAP/AI surface added; standalone + local defaults unaffected
+- [x] Full local sweep green (Task 10 Step 2 = the CI matrix) — *CI-on-PR runs when the user opens the PR (pending)*
+- [x] Plan checkboxes + `journal/PROGRESS.md` + `journal/DECISIONS.md` (D-019…D-025) updated — *PR opened by the user (pending)*
 
 ## Risks / open questions
 
@@ -1928,3 +1928,4 @@ git push -u origin phase-02-correctness-core
 
 - 2026-07-18: Plan written after user-approved brainstorm (scope: spine + full §6, auth/saga → Phase 3; all-ESM; fast-check). Context7-verified Drizzle RLS/pgSchema, pg-boss 12, fast-check 4, NestJS SWC/ESM caveat. Not yet started — awaiting plan review + user approval.
 - 2026-07-20: Plan-review loop complete — 3 iterations: iter 1 found 6 must-fix (build-vs-dist ordering, wiped-audit-chain hole, worker circular import, falsifiable stock property, postingDate ordering, missing reflect-metadata setup) + 11 advisories; iter 2 confirmed fixes, found 2 must-fix (relay boot-failure pool leak, vacuous depcruise resolution check) + 7 advisories; iter 3 **APPROVED** with 7 minor advisories, all folded in. Awaiting user sign-off — no implementation yet.
+- 2026-07-21: **Executed Tasks 0–10** via subagent-driven development (fresh implementer per task; two-stage review — spec compliance then code quality — between tasks; strict TDD). 18 commits on `phase-02-correctness-core`. ESM hard gate passed first try (D-020, fallback unused). Reviews forced 6 hardening fix commits (RLS blocklist assertion, repeatable-read chain verify + uuid normalization, relay poison-row/connection docs, typed quantity validation, numbering docs, period-gate FOR SHARE + seed never-clobber test). Full CI-matrix sweep green locally; compose /ready 503→migrate(v7)+seed→200 documented. D-019–D-025 appended; branch pushed; PR left for the user.
