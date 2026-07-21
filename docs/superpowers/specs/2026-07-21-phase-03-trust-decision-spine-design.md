@@ -42,7 +42,7 @@ apps/worker ─► @erp/platform (SLA consumer, saga executor, relay)
 USING (token_hash = current_setting('app.session_token_hash', true))
 ```
 
-The session service sets that GUC (transaction-local) to the presented token's hash inside the lookup transaction, as `app_rw`. A session row is visible **only to the bearer of its own token**; no GUC → zero rows. The catalog blocklist test stays honest with no exemptions. Expiry sweep runs on the worker's privileged connection (same pattern as the outbox relay). **Known limitation (recorded):** admin "revoke all sessions for user X" requires a privileged path — deferred to Day-0/admin tooling.
+The session service sets that GUC (transaction-local) to the presented token's hash inside the lookup transaction, as `app_rw`. The **same predicate applies as `WITH CHECK`**: the callback INSERT and logout UPDATE set the GUC to the just-generated/presented token's hash first, so writes are equally fail-closed (and the RLS probe suite covers reads AND writes). A session row is visible **only to the bearer of its own token**; no GUC → zero rows. The catalog blocklist test stays honest with no exemptions. Expiry sweep runs on the worker's privileged connection (same pattern as the outbox relay). **Known limitation (recorded):** admin "revoke all sessions for user X" requires a privileged path — deferred to Day-0/admin tooling.
 
 **CASL.** The ability factory maps realm roles + tenant to abilities; NestJS guards enforce them on the approval endpoints; **RLS remains the fail-closed DB backstop** (defense in depth, unchanged). `withTenantTx` now receives real `tenantId`/`userId` from the session — Phase 2's synthetic principals retire.
 
@@ -60,17 +60,21 @@ The session service sets that GUC (transaction-local) to the presented token's h
 
 **Deciding.** `approve`/`reject` run under `withTenantTx` as the deciding principal. CASL checks the step's assignee role; minimal SoD rule from day one: **the proposer can never approve their own request** (the full risk-tiered SoD matrix remains a §12 open question). Every transition writes audit + an outbox event (`ApprovalRequested`, `ApprovalStepDecided`, `ApprovalExecuted`, `ApprovalRejected`, `ApprovalStepOverdue` — versioned Zod contracts in `@erp/contracts`).
 
-**Execute-time re-validation (AI-safety invariant #3), inline and atomic.** The final approval executes **in the same transaction**: re-verify `payload_hash` against the stored payload → re-check CASL → re-check the aggregate version guard → run the registered executor (`kind → (tx, payload) => …`) → mark executed → audit → outbox. Stale version → typed failure, nothing written. Idempotent via the §8 table keyed by request id: a replayed execute is a provable no-op. This matches D-003 (execute commits atomically with the business write + audit).
+**Execute-time re-validation (AI-safety invariant #3), inline and atomic.** The final approval executes **in the same transaction**: re-verify `payload_hash` against the stored payload → re-check CASL → re-check the aggregate version guard → run the registered executor (`kind → (tx, payload) => …`) → mark executed → audit → outbox. Idempotent via the §8 table keyed by request id: a replayed execute is a provable no-op. This matches D-003 (execute commits atomically with the business write + audit).
+
+**Execution-failure semantics (savepoint, decision preserved).** The executor runs inside a **savepoint**. If re-validation or the executor fails (stale version, hash mismatch, domain error), the savepoint rolls back — the *business write* leaves nothing — but the outer transaction **commits the decision as fact**: step `approved`, request → terminal **`failed`** with the typed failure reason, audit row, `ApprovalExecutionFailed` event. Rationale: the human's approval happened and must be recorded (audit-first system); the aggregate moved, so the request is dead — the proposer re-proposes against current state. "Stale → fail, never force-apply" applies to the business write; the decision record is never lost, and `pending`-forever retry loops cannot occur.
 
 **Honest demo consumer.** The Phase 3 registered kind is `stock.adjust`: the payload is a real `adjustOnHand` input and the executor calls the real Phase 2 function with `expectedVersion`. Negative tests are therefore real: forged payload (hash mismatch) rejected; stale version rejected; replayed execute no-ops; `ai_ro` may propose, never approve/execute.
 
-**SLA/escalation — the first real pg-boss consumer.** A cron-fed `approval-sla-check` queue sweeps overdue pending steps → audit + `ApprovalStepOverdue` event + reassignment to the escalation role when configured. The handler is idempotency-keyed per (step, escalation) so at-least-once redelivery cannot double-escalate.
+**SLA/escalation — the first real pg-boss consumer.** A cron-fed `approval-sla-check` queue sweeps overdue pending steps → audit + `ApprovalStepOverdue` event + reassignment to the escalation role when configured; **when no escalation role is configured, the step is flag-marked escalated + evented, with no reassignment** (flag-only). The handler is idempotency-keyed per (step, escalation) so at-least-once redelivery cannot double-escalate.
 
 ## 6. Saga engine + §8 idempotency + eventing hardening
 
-**`platform.idempotency_keys` (§8 kernel primitive).** `(scope, key)` primary key, `tenant_id`, optional stored result JSONB, `created_at`. One helper — `withIdempotency(tx, scope, key, fn)` — inserts-or-detects in the same transaction as the work; a duplicate returns the stored outcome and runs nothing. Tenant-scoped uses (approval execute, saga steps) pass through RLS; infra scopes are writable only from the worker's privileged connection, so `app_rw` physically cannot forge infra idempotency rows.
+**`platform.idempotency_keys` (§8 kernel primitive).** `tenant_id NOT NULL` (parent-spec mandate) + `(tenant_id, scope, key)` primary key, optional stored result JSONB, `created_at`; standard tenant-isolation policy, ENABLE+FORCE. One helper — `withIdempotency(tx, scope, key, fn)` — inserts-or-detects in the same transaction as the work; a duplicate returns the stored outcome and runs nothing. Every Phase 3 scope (approval execute, saga steps, SLA escalations) is tenant-scoped; **tenant-less infra scopes are deferred until a real one exists** (YAGNI — the relay's idempotency remains `relayed_at` + archive `ON CONFLICT`).
 
 **Saga engine (§9.2).** `saga_instances` (kind, context JSONB, state `running → completed | failed → compensating → compensated`, correlation, current step) + `saga_steps` (ordered, per-step state, attempt count, last_error). Code-side registry: kind → ordered steps, each `{ name, run(tx, ctx), compensate?(tx, ctx) }`. Steps execute via a pg-boss `saga-step-execute` queue; each step runs inside `withTenantTx` (the worker's privileged connection drops to `app_rw`, so RLS binds business writes) wrapped in idempotency key `(saga:<instance>, <step>)`. Terminal step failure compensates completed steps in reverse. **Local compensation only** — distributed edges (SAP, remote GPU) stay reserved per §9.2.
+
+**Enqueue mechanism — outbox-driven, never direct `boss.send`.** Every saga transition rides the existing spine: `startSaga` inserts instance + steps **and appends a `SagaStepReady` outbox event in the same transaction**; a completing step marks itself done and appends the next step's `SagaStepReady` the same way; the approval decision path appends `SagaResumed` in the decision transaction. The relay fans these out to `saga-step-execute` via `ConsumerRegistry` — durable, at-least-once, replayable from `event_archive`. Rationale: direct `boss.send` from a handler either runs as `app_rw` (no grants on the `pgboss` schema — breaks the drop-to-`app_rw` model) or after commit (a crash between commit and send stalls the saga silently — the exact gap the outbox exists to close).
 
 **Approval bridge.** An `approval` step type opens an `approval_request` and **parks** — the saga is "a row awaiting action, not a suspended execution context." The approval engine's decision path enqueues the resume; rejection triggers compensation.
 
@@ -109,6 +113,8 @@ Same rhythm as Phase 2 — TDD per task; Testcontainers Postgres **plus Testcont
 | Full CSRF-token machinery | SPA phase | headless phase uses SameSite=Lax + custom-header requirement |
 | Risk-tiered SoD approver matrix | open question (§12) | minimal proposer≠approver rule ships now |
 
+**Also recorded as a D-NNN at execution:** the **composable-primitives architecture** (separate approval + saga engines bridged by a step type) as a deliberate refinement of §7's "ONE unified approval/workflow engine" — one engine *for approvals* consumed by both AI and business flows, distinct from process orchestration.
+
 **Non-goals:** no AI substrate (Phase 4), no SAP surface (Phase 5). Both toggles stay green.
 
 ## 10. Risks
@@ -120,9 +126,9 @@ Same rhythm as Phase 2 — TDD per task; Testcontainers Postgres **plus Testcont
 | Approval executor becomes a god-registry | executors are thin adapters to existing `@erp/platform` functions; one kind in Phase 3 |
 | Saga engine over-abstracts before real consumers | one real demo saga; registry API kept payload-compatible; no BPMN, no DSL |
 | Inline execute on final approve makes slow executors block the HTTP request | acceptable for Phase 3 (executors are single-tx domain functions); revisit with async execution + status polling if an executor ever crosses a network boundary |
+| pg-boss's `pgboss` schema (no FORCE RLS) could trip the catalog blocklist test if a suite runs both | catalog assertion stays in the db migrations suite (pg-boss never starts there); if that ever changes, exempt `pgboss` in the blocklist with a comment |
 
 ## 11. Open questions
 
 - Session lifetime + refresh policy (idle timeout vs absolute) — pick sensible defaults at plan time, revisit at Day-0.
 - Whether `approval_definitions` seeds ship in `seedBaseline` (dev convenience) or stay test-fixture-only.
-- Escalation reassignment semantics when no escalation role is configured (flag-only vs no-op).
