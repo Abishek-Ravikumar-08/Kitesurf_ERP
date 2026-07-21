@@ -72,11 +72,29 @@ async function outboxRows(t: TestDb, type: string, itemId: string) {
   return res.rows;
 }
 
+/** Open 2026 monthly fiscal periods so adjustOnHand postings pass the period gate
+ * (superuser bootstrap path, like seedItem). */
+async function seedOpenPeriods2026(t: TestDb): Promise<void> {
+  for (let p = 1; p <= 12; p++) {
+    const mm = String(p).padStart(2, "0");
+    const lastDay = new Date(Date.UTC(2026, p, 0)).getUTCDate();
+    await t.handle.db.insert(schema.fiscalPeriods).values({
+      id: randomUUID(),
+      tenantId: t.tenantId,
+      year: 2026,
+      period: p,
+      startsOn: `2026-${mm}-01`,
+      endsOn: `2026-${mm}-${String(lastDay).padStart(2, "0")}`,
+    });
+  }
+}
+
 describe("stock reservation / ATP", () => {
   let t: TestDb;
 
   beforeAll(async () => {
     t = await startTestDb();
+    await seedOpenPeriods2026(t);
   });
   afterAll(async () => {
     await t.stop();

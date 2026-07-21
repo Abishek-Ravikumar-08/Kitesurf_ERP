@@ -9,6 +9,7 @@ import {
   StockItemNotFoundError,
   VersionConflictError,
 } from "./errors.js";
+import { assertPeriodOpen } from "./fiscal.js";
 import { appendOutbox } from "./outbox.js";
 
 const QTY_RE = /^\d+(\.\d+)?$/;
@@ -217,7 +218,7 @@ export interface AdjustOnHandInput {
   /** Signed decimal string. */
   delta: string;
   reason: string;
-  /** YYYY-MM-DD. Part of the event contract from birth; the fiscal-period gate arrives in Task 9. */
+  /** YYYY-MM-DD. Gated by the fiscal calendar: the covering period must exist and be OPEN. */
   postingDate: string;
   actor: string | null;
   correlationId?: string;
@@ -228,9 +229,12 @@ export interface AdjustOnHandInput {
   expectedVersion?: number;
 }
 
-/** Adjust on-hand (goods receipt, cycle count, …) — guarded so it never strands reservations. */
+/** Adjust on-hand (goods receipt, cycle count, …) — guarded so it never strands reservations.
+ * An adjust is a POSTING: the fiscal-period gate runs first. Reservations are NOT postings
+ * and do not take the gate. */
 export async function adjustOnHand(tx: Tx, input: AdjustOnHandInput): Promise<void> {
   assertSignedQty(input.delta);
+  await assertPeriodOpen(tx, input.tenantId, input.postingDate);
   const updated = await tx
     .update(schema.stockItems)
     .set({
@@ -255,9 +259,6 @@ export async function adjustOnHand(tx: Tx, input: AdjustOnHandInput): Promise<vo
       .select({
         id: schema.stockItems.id,
         version: schema.stockItems.version,
-        onHand: schema.stockItems.onHand,
-        reserved: schema.stockItems.reserved,
-        allowNegative: schema.stockItems.allowNegative,
       })
       .from(schema.stockItems)
       .where(eq(schema.stockItems.id, input.stockItemId));

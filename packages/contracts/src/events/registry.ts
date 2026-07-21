@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import { FiscalPeriodClosedV1, FiscalPeriodReopenedV1 } from "./fiscal.js";
 import {
   StockAdjustedV1,
   StockReservationConsumedV1,
@@ -15,4 +16,6 @@ export const EVENT_SCHEMAS: Record<string, Record<number, z.ZodType>> = {
   StockReservationReleased: { 1: StockReservationReleasedV1 },
   StockReservationConsumed: { 1: StockReservationConsumedV1 },
   StockAdjusted: { 1: StockAdjustedV1 },
+  FiscalPeriodClosed: { 1: FiscalPeriodClosedV1 },
+  FiscalPeriodReopened: { 1: FiscalPeriodReopenedV1 },
 };
